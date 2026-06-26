@@ -12,6 +12,7 @@ import {
   Sparkles,
   PenLine,
   FileText,
+  AtSign,
   Sun,
   Moon,
   Tag,
@@ -85,6 +86,7 @@ export function Sidebar() {
   async function genAlias() {
     const domain = settings.data?.primary_alias_domain ?? "rajveer.space";
     const alias = randomAlias(domain);
+    api.createAlias({ address: alias }).catch(() => {}); // track it in the registry
     try {
       await navigator.clipboard.writeText(alias);
       toast.success("Alias copied", { description: alias });
@@ -202,6 +204,16 @@ export function Sidebar() {
           onClick={() => {
             setMobileNav(false);
             navigate({ to: "/drafts" });
+          }}
+        />
+        <SideItem
+          active={pathname === "/aliases"}
+          collapsed={collapsed}
+          icon={<AtSign size={18} />}
+          label="Aliases"
+          onClick={() => {
+            setMobileNav(false);
+            navigate({ to: "/aliases" });
           }}
         />
       </nav>

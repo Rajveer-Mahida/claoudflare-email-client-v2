@@ -132,3 +132,18 @@ export type DraftRow = {
 };
 
 export type SignatureResponse = { signature: string };
+
+// ── Aliases ──────────────────────────────────────────────────────────────────
+
+export type AliasRow = {
+  address: string;
+  name: string | null;
+  note: string | null;
+  disabled: number;
+  created_at: number;
+};
+
+export type AliasWithCount = AliasRow & {
+  mail_count: number;
+  unread_count: number;
+};

@@ -9,6 +9,8 @@ import type {
   ComposeRequest,
   DraftRow,
   UploadedAttachment,
+  AliasWithCount,
+  AliasRow,
 } from "@email/shared";
 
 export class ApiError extends Error {
@@ -54,11 +56,19 @@ export const api = {
   counts: () => req<CountsResponse>("/api/counts"),
   listLabels: () => req<LabelRow[]>("/api/labels"),
   settings: () => req<SettingsResponse>("/api/settings"),
-  messages: (params: { view: ViewName; q?: string; label?: string | null; limit?: number; offset?: number }) => {
+  messages: (params: {
+    view: ViewName;
+    q?: string;
+    label?: string | null;
+    to?: string | null;
+    limit?: number;
+    offset?: number;
+  }) => {
     const qs = new URLSearchParams();
     qs.set("view", params.view);
     if (params.q) qs.set("q", params.q);
     if (params.label) qs.set("label", params.label);
+    if (params.to) qs.set("to", params.to);
     if (params.limit) qs.set("limit", String(params.limit));
     if (params.offset) qs.set("offset", String(params.offset));
     return req<MessageListItem[]>(`/api/messages?${qs.toString()}`);
@@ -109,6 +119,15 @@ export const api = {
     req<DraftRow>("/api/drafts", body(data)),
   deleteDraft: (id: string) =>
     req<{ ok: true }>(`/api/drafts/${id}`, { method: "DELETE" }),
+  // aliases
+  listAliases: () => req<AliasWithCount[]>("/api/aliases"),
+  createAlias: (data: { address?: string; local?: string; domain?: string; name?: string; note?: string }) =>
+    req<AliasRow>("/api/aliases", body(data)),
+  updateAlias: (data: { address: string; name?: string | null; note?: string | null; disabled?: 0 | 1 }) =>
+    req<{ ok: true }>("/api/aliases/update", body(data)),
+  deleteAlias: (address: string) =>
+    req<{ ok: true }>("/api/aliases/delete", body({ address })),
+
   uploadFile: async (file: File): Promise<UploadedAttachment> => {
     const fd = new FormData();
     fd.append("file", file);

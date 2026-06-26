@@ -13,6 +13,7 @@ import { attachments } from "./routes/attachments";
 import { compose } from "./routes/compose";
 import { uploads } from "./routes/uploads";
 import { drafts } from "./routes/drafts";
+import { aliases } from "./routes/aliases";
 
 const app = new Hono<HonoEnv>();
 
@@ -42,6 +43,7 @@ app.route("/api/reply", reply);
 app.route("/api/send", compose);
 app.route("/api/uploads", uploads);
 app.route("/api/drafts", drafts);
+app.route("/api/aliases", aliases);
 app.route("/api/attachments", attachments);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

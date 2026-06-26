@@ -11,6 +11,7 @@ import { EmptyDetail } from "@/components/EmptyDetail";
 import { LoginPage } from "@/components/LoginPage";
 import { SettingsPage } from "@/components/SettingsPage";
 import { DraftsPage } from "@/components/DraftsPage";
+import { AliasesPage } from "@/components/AliasesPage";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 
@@ -56,12 +57,19 @@ const draftsRoute = createRoute({
   component: DraftsPage,
 });
 
+const aliasesRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/aliases",
+  component: AliasesPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   shellRoute.addChildren([
     mailLayoutRoute.addChildren([indexRoute, mailRoute]),
     settingsRoute,
     draftsRoute,
+    aliasesRoute,
   ]),
 ]);
 

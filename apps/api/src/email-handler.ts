@@ -4,6 +4,7 @@
 
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
+import { registerAlias, isAliasDisabled } from "./db";
 
 const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
 
@@ -25,6 +26,14 @@ export async function handleEmail(
     }
     return;
   }
+
+  // Managed aliases: bounce mail to a disabled alias; auto-track new ones.
+  if (await isAliasDisabled(env.DB, recipient)) {
+    console.log("Rejected (disabled alias):", recipient);
+    message.setReject("Address not active");
+    return;
+  }
+  await registerAlias(env.DB, recipient);
 
   const raw = await new Response(message.raw).arrayBuffer();
   const parsed = await new PostalMime().parse(raw);

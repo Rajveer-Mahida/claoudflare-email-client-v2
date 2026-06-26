@@ -10,6 +10,8 @@ import type {
   LabelCount,
   ViewName,
   DraftRow,
+  AliasRow,
+  AliasWithCount,
 } from "@email/shared";
 
 type DB = D1Database;
@@ -53,6 +55,7 @@ export async function listMessages(
     q?: string;
     view?: ViewName;
     labelId?: string;
+    to?: string;
   } = {},
 ): Promise<MessageRow[]> {
   const limit = opts.limit ?? 50;
@@ -60,6 +63,11 @@ export async function listMessages(
   const view = opts.view ?? "inbox";
   const now = Date.now();
   const { where, args } = viewWhere(view, now);
+
+  // Optional "scope to one alias" filter (uses m.to_addr in joined queries).
+  const toClause = opts.to ? " AND to_addr = ?" : "";
+  const toClauseM = opts.to ? " AND m.to_addr = ?" : "";
+  const toArgs = opts.to ? [opts.to] : [];
 
   if (opts.labelId) {
     if (opts.q?.trim()) {
@@ -69,10 +77,10 @@ export async function listMessages(
           `SELECT m.* FROM messages m
            JOIN messages_fts f ON f.rowid = m.rowid
            JOIN message_labels ml ON ml.message_id = m.id
-           WHERE messages_fts MATCH ? AND ml.label_id = ? AND m.is_deleted = 0
+           WHERE messages_fts MATCH ? AND ml.label_id = ? AND m.is_deleted = 0${toClauseM}
            ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
         )
-        .bind(`"${term}"*`, opts.labelId, limit, offset)
+        .bind(`"${term}"*`, opts.labelId, ...toArgs, limit, offset)
         .all<MessageRow>();
       return res.results ?? [];
     }
@@ -80,10 +88,10 @@ export async function listMessages(
       .prepare(
         `SELECT m.* FROM messages m
          JOIN message_labels ml ON ml.message_id = m.id
-         WHERE ml.label_id = ? AND m.is_deleted = 0
+         WHERE ml.label_id = ? AND m.is_deleted = 0${toClauseM}
          ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
       )
-      .bind(opts.labelId, limit, offset)
+      .bind(opts.labelId, ...toArgs, limit, offset)
       .all<MessageRow>();
     return res.results ?? [];
   }
@@ -94,19 +102,19 @@ export async function listMessages(
       .prepare(
         `SELECT m.* FROM messages m
          JOIN messages_fts f ON f.rowid = m.rowid
-         WHERE messages_fts MATCH ? AND ${where}
+         WHERE messages_fts MATCH ? AND ${where}${toClauseM}
          ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
       )
-      .bind(`"${term}"*`, ...args, limit, offset)
+      .bind(`"${term}"*`, ...args, ...toArgs, limit, offset)
       .all<MessageRow>();
     return res.results ?? [];
   }
 
   const res = await db
     .prepare(
-      `SELECT * FROM messages WHERE ${where} ORDER BY received_at DESC LIMIT ? OFFSET ?`,
+      `SELECT * FROM messages WHERE ${where}${toClause} ORDER BY received_at DESC LIMIT ? OFFSET ?`,
     )
-    .bind(...args, limit, offset)
+    .bind(...args, ...toArgs, limit, offset)
     .all<MessageRow>();
   return res.results ?? [];
 }
@@ -507,6 +515,89 @@ export async function deleteDraft(db: DB, id: string): Promise<void> {
 export async function draftCount(db: DB): Promise<number> {
   const r = await db.prepare(`SELECT COUNT(*) AS n FROM drafts`).first<{ n: number }>();
   return r?.n ?? 0;
+}
+
+// ── Aliases ──────────────────────────────────────────────────────────────────
+
+export async function listAliases(db: DB): Promise<AliasWithCount[]> {
+  const res = await db
+    .prepare(
+      `SELECT a.address, a.name, a.note, a.disabled, a.created_at,
+              COUNT(m.id) AS mail_count,
+              SUM(CASE WHEN m.is_read = 0 AND m.direction = 'in' THEN 1 ELSE 0 END) AS unread_count
+       FROM aliases a
+       LEFT JOIN messages m ON m.to_addr = a.address AND m.is_deleted = 0 AND m.direction = 'in'
+       GROUP BY a.address
+       ORDER BY a.created_at DESC`,
+    )
+    .all<AliasWithCount>();
+  return (res.results ?? []).map((r) => ({
+    ...r,
+    mail_count: r.mail_count ?? 0,
+    unread_count: r.unread_count ?? 0,
+  }));
+}
+
+export async function createAlias(
+  db: DB,
+  address: string,
+  name: string | null,
+  note: string | null,
+): Promise<AliasRow> {
+  const created_at = Date.now();
+  await db
+    .prepare(
+      `INSERT INTO aliases (address, name, note, disabled, created_at) VALUES (?,?,?,0,?)
+       ON CONFLICT(address) DO UPDATE SET name = COALESCE(excluded.name, aliases.name),
+                                          note = COALESCE(excluded.note, aliases.note)`,
+    )
+    .bind(address, name, note, created_at)
+    .run();
+  return (await db.prepare(`SELECT * FROM aliases WHERE address = ?`).bind(address).first<AliasRow>())!;
+}
+
+/** Auto-track an alias on first inbound (no-op if it already exists). */
+export async function registerAlias(db: DB, address: string): Promise<void> {
+  await db
+    .prepare(`INSERT OR IGNORE INTO aliases (address, disabled, created_at) VALUES (?,0,?)`)
+    .bind(address, Date.now())
+    .run();
+}
+
+export async function isAliasDisabled(db: DB, address: string): Promise<boolean> {
+  const r = await db
+    .prepare(`SELECT disabled FROM aliases WHERE address = ?`)
+    .bind(address)
+    .first<{ disabled: number }>();
+  return (r?.disabled ?? 0) === 1;
+}
+
+export async function updateAlias(
+  db: DB,
+  address: string,
+  fields: { name?: string | null; note?: string | null; disabled?: 0 | 1 },
+): Promise<void> {
+  const sets: string[] = [];
+  const args: unknown[] = [];
+  if (fields.name !== undefined) {
+    sets.push("name = ?");
+    args.push(fields.name);
+  }
+  if (fields.note !== undefined) {
+    sets.push("note = ?");
+    args.push(fields.note);
+  }
+  if (fields.disabled !== undefined) {
+    sets.push("disabled = ?");
+    args.push(fields.disabled);
+  }
+  if (!sets.length) return;
+  args.push(address);
+  await db.prepare(`UPDATE aliases SET ${sets.join(", ")} WHERE address = ?`).bind(...args).run();
+}
+
+export async function deleteAlias(db: DB, address: string): Promise<void> {
+  await db.prepare(`DELETE FROM aliases WHERE address = ?`).bind(address).run();
 }
 
 export async function claimPendingMessage(db: DB, id: string): Promise<boolean> {

@@ -36,10 +36,11 @@ messages.get("/", async (c) => {
   const view = (c.req.query("view") as ViewName) || "inbox";
   const q = c.req.query("q") ?? undefined;
   const labelId = c.req.query("label") ?? undefined;
+  const to = c.req.query("to") ?? undefined;
   const limit = Number(c.req.query("limit") ?? "50");
   const offset = Number(c.req.query("offset") ?? "0");
 
-  const rows = await listMessages(db, { view, q, labelId, limit, offset });
+  const rows = await listMessages(db, { view, q, labelId, to, limit, offset });
   const labelMap = await labelsForMessages(db, rows.map((m) => m.id));
 
   const items: MessageListItem[] = rows.map(({ html: _h, text: _t, ...rest }) => ({

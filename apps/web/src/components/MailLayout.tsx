@@ -20,10 +20,10 @@ const VIEW_TITLE: Record<string, string> = {
 };
 
 export function MailLayout() {
-  const { view, q, labelId, setFilter, selection, setMobileNav } = useUI();
+  const { view, q, labelId, aliasFilter, setFilter, setAliasFilter, selection, setMobileNav } = useUI();
   const [draft, setDraft] = useState(q);
   const inputRef = useRef<HTMLInputElement>(null);
-  const messages = useMessages(view, q, labelId);
+  const messages = useMessages(view, q, labelId, aliasFilter);
   const markAllRead = useMarkAllRead();
   const labels = useLabels();
 
@@ -51,7 +51,8 @@ export function MailLayout() {
   useEffect(() => setDraft(q), [q]);
 
   const labelName = labelId ? labels.data?.find((l) => l.id === labelId)?.name : null;
-  const title = labelName ?? VIEW_TITLE[view] ?? "Inbox";
+  const aliasShort = aliasFilter ? aliasFilter.split("@")[0] : null;
+  const title = aliasShort ?? labelName ?? VIEW_TITLE[view] ?? "Inbox";
 
   return (
     <div className="flex min-w-0 flex-1 overflow-hidden">
@@ -70,6 +71,15 @@ export function MailLayout() {
                 <Menu size={18} />
               </IconButton>
               <h1 className="font-display text-xl font-semibold tracking-tight">{title}</h1>
+              {aliasFilter && (
+                <button
+                  onClick={() => setAliasFilter(null)}
+                  className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[11px] text-accent"
+                  title={aliasFilter}
+                >
+                  alias <X size={11} />
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-0.5">
               <Tip label="Mark all read">

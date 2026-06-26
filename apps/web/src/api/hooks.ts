@@ -12,8 +12,8 @@ export const qk = {
   counts: ["counts"] as const,
   labels: ["labels"] as const,
   settings: ["settings"] as const,
-  messages: (view: ViewName, q: string, labelId: string | null) =>
-    ["messages", { view, q, labelId }] as const,
+  messages: (view: ViewName, q: string, labelId: string | null, to: string | null) =>
+    ["messages", { view, q, labelId, to }] as const,
   message: (id: string) => ["message", id] as const,
 };
 
@@ -30,12 +30,40 @@ export function useSettings() {
   return useQuery({ queryKey: qk.settings, queryFn: api.settings });
 }
 
-export function useMessages(view: ViewName, q: string, labelId: string | null) {
+export function useMessages(view: ViewName, q: string, labelId: string | null, to: string | null = null) {
   return useQuery({
-    queryKey: qk.messages(view, q, labelId),
-    queryFn: () => api.messages({ view, q, label: labelId }),
+    queryKey: qk.messages(view, q, labelId, to),
+    queryFn: () => api.messages({ view, q, label: labelId, to }),
     refetchInterval: 30_000,
     placeholderData: (prev) => prev,
+  });
+}
+
+export function useAliases() {
+  return useQuery({ queryKey: ["aliases"], queryFn: api.listAliases });
+}
+
+export function useCreateAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createAlias,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["aliases"] }),
+  });
+}
+
+export function useUpdateAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.updateAlias,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["aliases"] }),
+  });
+}
+
+export function useDeleteAlias() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (address: string) => api.deleteAlias(address),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["aliases"] }),
   });
 }
 

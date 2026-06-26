@@ -41,8 +41,10 @@ type UIState = {
   // current list filter
   view: ViewName;
   labelId: string | null;
+  aliasFilter: string | null;
   q: string;
   setFilter: (next: { view?: ViewName; labelId?: string | null; q?: string }) => void;
+  setAliasFilter: (address: string | null) => void;
 
   // multi-select for bulk actions
   selection: Set<string>;
@@ -89,15 +91,19 @@ export const useUI = create<UIState>((set, get) => ({
 
   view: "inbox",
   labelId: null,
+  aliasFilter: null,
   q: "",
   setFilter: (next) =>
     set((s) => ({
       view: next.view ?? s.view,
       labelId: next.labelId !== undefined ? next.labelId : s.labelId,
       q: next.q !== undefined ? next.q : s.q,
+      aliasFilter: null,
       selection: new Set<string>(),
       mobileNavOpen: false,
     })),
+  setAliasFilter: (address) =>
+    set({ aliasFilter: address, view: "inbox", labelId: null, q: "", mobileNavOpen: false }),
 
   selection: new Set<string>(),
   toggleSelect: (id) =>
