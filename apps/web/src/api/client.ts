@@ -107,8 +107,13 @@ export const api = {
     sendAfter?: number;
   }) => req<{ ok: true; id: string; pending?: boolean }>("/api/reply", body(data)),
 
-  setSettings: (data: { reply_enabled?: boolean; primary_alias_domain?: string; signature?: string }) =>
-    req<{ ok: true }>("/api/settings", body(data)),
+  setSettings: (data: {
+    reply_enabled?: boolean;
+    primary_alias_domain?: string;
+    signature?: string;
+    block_remote_images?: boolean;
+    allow_image_sender?: string;
+  }) => req<{ ok: true }>("/api/settings", body(data)),
 
   // compose / drafts / uploads
   send: (data: ComposeRequest) =>

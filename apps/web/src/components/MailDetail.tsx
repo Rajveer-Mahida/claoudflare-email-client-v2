@@ -17,9 +17,14 @@ import {
   Download,
   Sun,
   Moon,
+  ImageOff,
+  Clock3,
+  XCircle,
 } from "lucide-react";
 import type { MessageRow, AttachmentRow } from "@email/shared";
-import { useMessage, useFlag, useMarkRead, useSnooze, useSoftDelete } from "@/api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMessage, useFlag, useMarkRead, useSnooze, useSoftDelete, useSettings } from "@/api/hooks";
+import { api } from "@/api/client";
 import { useUI } from "@/lib/store";
 import { Avatar, IconButton, Tip, Spinner } from "@/components/primitives";
 import { SnoozeMenu } from "@/components/SnoozeMenu";
@@ -299,11 +304,35 @@ function ThreadMessage({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [loadImages, setLoadImages] = useState(false);
   const emailTheme = useUI((s) => s.emailTheme);
+  const settings = useSettings();
+  const qc = useQueryClient();
   const outbound = m.direction === "out";
   const peer = outbound ? m.to_addr : m.from_addr;
-  const html = renderEmailHtml(m.html, m.id);
+  const sender = m.from_addr.toLowerCase();
   const isOpen = collapsible ? open : true;
+
+  const allowed = settings.data?.image_allowlist?.includes(sender) ?? false;
+  const blockSetting = settings.data?.block_remote_images ?? true;
+  const blocking = blockSetting && !allowed && !loadImages;
+  const { html, blocked } = renderEmailHtml(m.html, m.id, { blockRemote: blocking });
+
+  // Scheduled vs in-flight send state for outbound rows.
+  const scheduled = m.send_state === "pending" && !!m.send_after && m.send_after > Date.now();
+
+  async function allowSender() {
+    await api.setSettings({ allow_image_sender: sender });
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
+  function cancelScheduled() {
+    api.cancelSend(m.id).then(() => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: ["message"] });
+      qc.invalidateQueries({ queryKey: ["counts"] });
+      toast.message("Scheduled send cancelled");
+    });
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-elevated">
@@ -318,11 +347,15 @@ function ThreadMessage({
             <span className="truncate text-sm font-semibold">
               {outbound ? "You" : displayName(m.from_name, m.from_addr)}
             </span>
-            {m.send_state === "pending" && (
+            {scheduled ? (
+              <span className="flex items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                <Clock3 size={11} /> Scheduled · {formatFullDate(m.send_after!)}
+              </span>
+            ) : m.send_state === "pending" ? (
               <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
                 sending…
               </span>
-            )}
+            ) : null}
             <span className="ml-auto shrink-0 text-[11px] text-faint">{formatFullDate(m.received_at)}</span>
           </div>
           <p className="truncate text-xs text-muted">
@@ -330,6 +363,19 @@ function ThreadMessage({
           </p>
         </div>
       </button>
+
+      {scheduled && (
+        <div className="flex items-center gap-2 border-t border-border bg-accent-soft/40 px-4 py-2 text-xs">
+          <Clock3 size={14} className="text-accent" />
+          <span className="text-muted">Sends {formatFullDate(m.send_after!)}</span>
+          <button
+            onClick={cancelScheduled}
+            className="ml-auto flex items-center gap-1 font-medium text-danger hover:underline"
+          >
+            <XCircle size={13} /> Cancel
+          </button>
+        </div>
+      )}
 
       <AnimatePresence initial={false}>
         {isOpen && (
@@ -340,6 +386,20 @@ function ThreadMessage({
             transition={{ duration: 0.2 }}
           >
             <div className="border-t border-border p-3 md:p-4">
+              {blocked > 0 && blocking && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-inset px-3 py-2 text-xs">
+                  <ImageOff size={14} className="text-muted" />
+                  <span className="text-muted">
+                    {blocked} remote image{blocked > 1 ? "s" : ""} blocked
+                  </span>
+                  <button onClick={() => setLoadImages(true)} className="font-medium text-accent hover:underline">
+                    Load images
+                  </button>
+                  <button onClick={allowSender} className="text-faint hover:text-fg">
+                    Always from {sender}
+                  </button>
+                </div>
+              )}
               <div
                 className={`email-surface overflow-x-auto rounded-xl${
                   emailTheme === "dark" ? " is-dark" : ""

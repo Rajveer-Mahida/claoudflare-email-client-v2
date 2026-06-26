@@ -90,6 +90,8 @@ export type SettingsResponse = {
   primary_alias_domain: string;
   alias_domains: string[];
   signature: string;
+  block_remote_images: boolean;
+  image_allowlist: string[];
 };
 
 export type FlagField = "is_starred" | "is_archived" | "is_deleted" | "is_read";

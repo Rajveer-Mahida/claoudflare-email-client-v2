@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import * as Switch from "@radix-ui/react-switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine } from "lucide-react";
+import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine, ShieldCheck } from "lucide-react";
 import { useSettings, useSetSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
 import { Button } from "@/components/primitives";
@@ -43,6 +43,26 @@ export function SettingsPage() {
                 save.mutate(
                   { reply_enabled: v },
                   { onSuccess: () => toast.success(v ? "Replies enabled" : "Replies disabled") },
+                )
+              }
+              className="relative h-7 w-12 rounded-full bg-border-strong transition-colors data-[state=checked]:bg-accent"
+            >
+              <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-6" />
+            </Switch.Root>
+          </Section>
+
+          {/* Privacy */}
+          <Section
+            icon={<ShieldCheck size={18} />}
+            title="Block remote images"
+            desc="Hide remote images until you load them — stops tracking pixels."
+          >
+            <Switch.Root
+              checked={s?.block_remote_images ?? true}
+              onCheckedChange={(v) =>
+                save.mutate(
+                  { block_remote_images: v },
+                  { onSuccess: () => toast.success(v ? "Remote images blocked" : "Remote images allowed") },
                 )
               }
               className="relative h-7 w-12 rounded-full bg-border-strong transition-colors data-[state=checked]:bg-accent"

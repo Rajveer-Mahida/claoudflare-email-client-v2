@@ -191,6 +191,14 @@
     height: auto;
     border-radius: 6px;
   }
+  /* blocked remote image — subtle placeholder instead of a broken-image icon */
+  .email-html img[data-blocked="1"] {
+    min-width: 24px;
+    min-height: 24px;
+    background: var(--inset);
+    border: 1px dashed var(--border-strong);
+    border-radius: 6px;
+  }
   .email-html blockquote {
     border-left: 3px solid var(--border-strong);
     padding-left: 1rem;

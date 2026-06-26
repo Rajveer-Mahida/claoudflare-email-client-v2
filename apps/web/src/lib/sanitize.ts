@@ -20,13 +20,37 @@ export function rewriteCids(html: string, messageId: string): string {
   });
 }
 
-/** Sanitize email HTML for safe rendering, after rewriting inline-image refs. */
-export function renderEmailHtml(html: string | null | undefined, messageId: string): string {
-  if (!html) return "";
+/**
+ * Sanitize email HTML for safe rendering, after rewriting inline-image refs.
+ * When `blockRemote` is set, remote `http(s)` images are stripped (their URL is
+ * stashed on `data-blocked-src`) so tracking pixels don't load — returns how
+ * many were blocked. cid:/data:/relative images are always kept.
+ */
+export function renderEmailHtml(
+  html: string | null | undefined,
+  messageId: string,
+  opts?: { blockRemote?: boolean },
+): { html: string; blocked: number } {
+  if (!html) return { html: "", blocked: 0 };
   const withCids = rewriteCids(String(html), messageId);
-  return DOMPurify.sanitize(withCids, {
+  let out = DOMPurify.sanitize(withCids, {
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "link", "meta", "form"],
     FORBID_ATTR: ["srcset"],
     ALLOW_DATA_ATTR: false,
   });
+
+  let blocked = 0;
+  if (opts?.blockRemote) {
+    out = out.replace(/<img\b[^>]*>/gi, (tag) => {
+      const m = tag.match(/\ssrc\s*=\s*("([^"]*)"|'([^']*)')/i);
+      if (!m) return tag;
+      const url = (m[2] ?? m[3] ?? "").trim();
+      if (!/^https?:/i.test(url)) return tag; // keep cid:/data:/relative
+      blocked++;
+      return tag
+        .replace(m[0], ` data-blocked-src="${url.replace(/"/g, "&quot;")}"`)
+        .replace(/<img\b/i, '<img data-blocked="1"');
+    });
+  }
+  return { html: out, blocked };
 }

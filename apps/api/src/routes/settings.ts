@@ -12,19 +12,50 @@ import {
 
 export const settings = new Hono<HonoEnv>();
 
+function parseAllowlist(raw: string | null): string[] {
+  try {
+    const a = raw ? JSON.parse(raw) : [];
+    return Array.isArray(a) ? a : [];
+  } catch {
+    return [];
+  }
+}
+
 settings.get("/", async (c) => {
+  const blockRaw = await getSetting(c.env.DB, "block_remote_images");
   return c.json({
     reply_enabled: await getReplyEnabled(c.env.DB),
     primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env),
     alias_domains: aliasDomains(c.env),
     signature: (await getSetting(c.env.DB, "signature")) ?? "",
+    block_remote_images: blockRaw === null ? true : blockRaw === "1",
+    image_allowlist: parseAllowlist(await getSetting(c.env.DB, "image_allowlist")),
   });
 });
 
 settings.post("/", async (c) => {
   const body = await c.req
-    .json<{ reply_enabled?: boolean; primary_alias_domain?: string; signature?: string }>()
+    .json<{
+      reply_enabled?: boolean;
+      primary_alias_domain?: string;
+      signature?: string;
+      block_remote_images?: boolean;
+      allow_image_sender?: string;
+    }>()
     .catch(() => ({}) as Record<string, never>);
+
+  if (typeof body.block_remote_images === "boolean") {
+    await setSetting(c.env.DB, "block_remote_images", body.block_remote_images ? "1" : "0");
+    return c.json({ ok: true });
+  }
+
+  if (typeof body.allow_image_sender === "string" && body.allow_image_sender.trim()) {
+    const list = parseAllowlist(await getSetting(c.env.DB, "image_allowlist"));
+    const addr = body.allow_image_sender.trim().toLowerCase();
+    if (!list.includes(addr)) list.push(addr);
+    await setSetting(c.env.DB, "image_allowlist", JSON.stringify(list));
+    return c.json({ ok: true });
+  }
 
   if (typeof body.signature === "string") {
     await setSetting(c.env.DB, "signature", body.signature);

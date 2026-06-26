@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Send, X } from "lucide-react";
+import { Send, X, Clock } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useReply, useCancelSend, useSettings } from "@/api/hooks";
 import { Button, Spinner } from "@/components/primitives";
@@ -22,6 +22,8 @@ export function ReplyComposer({
 }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const reply = useReply();
   const cancelSend = useCancelSend();
@@ -37,15 +39,21 @@ export function ReplyComposer({
     if (!text.trim() || busy) return;
     setBusy(true);
     const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
+    const isScheduled = showSchedule && scheduleAt;
     try {
       const res = await reply.mutateAsync({
         messageId,
         to,
         subject: replySubject,
         text,
-        sendAfter: Date.now() + UNDO_WINDOW,
+        sendAfter: isScheduled ? new Date(scheduleAt).getTime() : Date.now() + UNDO_WINDOW,
       });
       onClose();
+
+      if (isScheduled) {
+        toast.success("Reply scheduled", { description: `To ${to}` });
+        return;
+      }
 
       // Flush the send ourselves once the undo window passes — independent of any
       // cron. send-now claims the pending row atomically, so it can't double-send
@@ -109,12 +117,45 @@ export function ReplyComposer({
             rows={4}
             className="w-full resize-none bg-transparent px-4 py-3 text-[14px] leading-relaxed outline-none placeholder:text-faint disabled:opacity-60"
           />
+          {showSchedule && (
+            <div className="flex items-center gap-2 border-t border-border px-4 py-2 text-sm">
+              <Clock size={15} className="text-muted" />
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                className="rounded-lg border border-border bg-bg px-2 py-1 text-sm outline-none"
+              />
+              <button
+                onClick={() => {
+                  setShowSchedule(false);
+                  setScheduleAt("");
+                }}
+                className="text-xs text-faint hover:text-fg"
+              >
+                cancel
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between px-4 py-2.5">
-            <span className="text-[11px] text-faint">⌘↵ to send · 8s undo</span>
-            <Button variant="primary" size="sm" onClick={send} disabled={!text.trim() || busy || !!disabled}>
-              {busy ? <Spinner /> : <Send size={15} />}
-              Send
-            </Button>
+            <span className="text-[11px] text-faint">
+              {showSchedule && scheduleAt ? "scheduled" : "⌘↵ to send · 8s undo"}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowSchedule((s) => !s)}
+                className={`grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-inset hover:text-fg ${
+                  showSchedule ? "text-accent" : ""
+                }`}
+                aria-label="Schedule send"
+              >
+                <Clock size={16} />
+              </button>
+              <Button variant="primary" size="sm" onClick={send} disabled={!text.trim() || busy || !!disabled}>
+                {busy ? <Spinner /> : <Send size={15} />}
+                {showSchedule && scheduleAt ? "Schedule" : "Send"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
