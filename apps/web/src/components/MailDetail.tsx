@@ -34,6 +34,26 @@ import { useShortcuts } from "@/lib/useShortcuts";
 import { renderEmailHtml } from "@/lib/sanitize";
 import { formatFullDate, formatBytes, displayName } from "@/lib/utils";
 
+// Remember which individual messages the user chose to load images for (persists
+// the "just this email" choice across reloads, distinct from the per-sender allowlist).
+const IMG_KEY = "aria-img-loaded";
+function loadedImageSet(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(IMG_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function rememberImageLoaded(id: string) {
+  const s = loadedImageSet();
+  s.add(id);
+  try {
+    localStorage.setItem(IMG_KEY, JSON.stringify([...s]));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function MailDetail() {
   const { id } = useParams({ from: "/shell/mailLayout/mail/$id" });
   const navigate = useNavigate();
@@ -304,7 +324,7 @@ function ThreadMessage({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [loadImages, setLoadImages] = useState(false);
+  const [loadImages, setLoadImages] = useState(() => loadedImageSet().has(m.id));
   const emailTheme = useUI((s) => s.emailTheme);
   const settings = useSettings();
   const qc = useQueryClient();
@@ -387,16 +407,22 @@ function ThreadMessage({
           >
             <div className="border-t border-border p-3 md:p-4">
               {blocked > 0 && blocking && (
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-inset px-3 py-2 text-xs">
-                  <ImageOff size={14} className="text-muted" />
-                  <span className="text-muted">
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border bg-inset px-3 py-2 text-xs">
+                  <span className="flex items-center gap-1.5 text-muted">
+                    <ImageOff size={14} />
                     {blocked} remote image{blocked > 1 ? "s" : ""} blocked
                   </span>
-                  <button onClick={() => setLoadImages(true)} className="font-medium text-accent hover:underline">
-                    Load images
+                  <button
+                    onClick={() => {
+                      rememberImageLoaded(m.id);
+                      setLoadImages(true);
+                    }}
+                    className="font-medium text-accent hover:underline"
+                  >
+                    Show in this email
                   </button>
-                  <button onClick={allowSender} className="text-faint hover:text-fg">
-                    Always from {sender}
+                  <button onClick={allowSender} className="font-medium text-accent hover:underline">
+                    Always allow {sender}
                   </button>
                 </div>
               )}
