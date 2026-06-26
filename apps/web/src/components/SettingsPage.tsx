@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine, ShieldCheck
 import { useSettings, useSetSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
 import { Button } from "@/components/primitives";
+import { RulesManager } from "@/components/RulesManager";
 import { cn } from "@/lib/utils";
 
 export function SettingsPage() {
@@ -148,6 +149,8 @@ export function SettingsPage() {
               </div>
             </div>
           </Section>
+
+          <RulesManager />
         </div>
       </div>
     </div>

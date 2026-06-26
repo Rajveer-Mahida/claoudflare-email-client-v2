@@ -4,7 +4,7 @@
 
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
-import { registerAlias, isAliasDisabled } from "./db";
+import { registerAlias, isAliasDisabled, applyRules } from "./db";
 
 const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
 
@@ -77,6 +77,14 @@ export async function handleEmail(
       ts,
     )
     .run();
+
+  // Apply user filters (label / archive / mark-read / trash).
+  await applyRules(env.DB, {
+    id,
+    from_addr: fromAddr,
+    to_addr: recipient,
+    subject: parsed.subject ?? "",
+  });
 
   for (const att of parsed.attachments ?? []) {
     const aid = crypto.randomUUID();

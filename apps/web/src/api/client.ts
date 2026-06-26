@@ -11,6 +11,7 @@ import type {
   UploadedAttachment,
   AliasWithCount,
   AliasRow,
+  RuleRow,
 } from "@email/shared";
 
 export class ApiError extends Error {
@@ -124,6 +125,20 @@ export const api = {
     req<DraftRow>("/api/drafts", body(data)),
   deleteDraft: (id: string) =>
     req<{ ok: true }>(`/api/drafts/${id}`, { method: "DELETE" }),
+  // rules
+  listRules: () => req<RuleRow[]>("/api/rules"),
+  createRule: (data: {
+    field: string;
+    op: string;
+    value: string;
+    action: string;
+    action_value?: string | null;
+  }) => req<RuleRow>("/api/rules", body(data)),
+  updateRule: (id: string, enabled: boolean) =>
+    req<{ ok: true }>("/api/rules/update", body({ id, enabled })),
+  deleteRule: (id: string) => req<{ ok: true }>("/api/rules/delete", body({ id })),
+  runRules: () => req<{ ok: true; touched: number }>("/api/rules/run", { method: "POST" }),
+
   // aliases
   listAliases: () => req<AliasWithCount[]>("/api/aliases"),
   createAlias: (data: { address?: string; local?: string; domain?: string; name?: string; note?: string }) =>

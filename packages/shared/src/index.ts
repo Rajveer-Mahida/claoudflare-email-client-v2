@@ -149,3 +149,20 @@ export type AliasWithCount = AliasRow & {
   mail_count: number;
   unread_count: number;
 };
+
+// ── Filters / rules ──────────────────────────────────────────────────────────
+
+export type RuleField = "from" | "to" | "subject";
+export type RuleOp = "contains" | "equals" | "startswith" | "endswith";
+export type RuleAction = "label" | "archive" | "read" | "trash";
+
+export type RuleRow = {
+  id: string;
+  field: RuleField;
+  op: RuleOp;
+  value: string;
+  action: RuleAction;
+  action_value: string | null; // label_id when action === "label"
+  enabled: number;
+  created_at: number;
+};

@@ -43,6 +43,45 @@ export function useAliases() {
   return useQuery({ queryKey: ["aliases"], queryFn: api.listAliases });
 }
 
+export function useRules() {
+  return useQuery({ queryKey: ["rules"], queryFn: api.listRules });
+}
+
+export function useCreateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.createRule,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["rules"] }),
+  });
+}
+
+export function useUpdateRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => api.updateRule(id, enabled),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["rules"] }),
+  });
+}
+
+export function useDeleteRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteRule(id),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["rules"] }),
+  });
+}
+
+export function useRunRules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.runRules,
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: qk.counts });
+    },
+  });
+}
+
 export function useCreateAlias() {
   const qc = useQueryClient();
   return useMutation({

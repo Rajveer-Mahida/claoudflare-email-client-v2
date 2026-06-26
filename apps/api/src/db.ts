@@ -12,6 +12,7 @@ import type {
   DraftRow,
   AliasRow,
   AliasWithCount,
+  RuleRow,
 } from "@email/shared";
 
 type DB = D1Database;
@@ -598,6 +599,103 @@ export async function updateAlias(
 
 export async function deleteAlias(db: DB, address: string): Promise<void> {
   await db.prepare(`DELETE FROM aliases WHERE address = ?`).bind(address).run();
+}
+
+// ── Filters / rules ──────────────────────────────────────────────────────────
+
+export async function listRules(db: DB): Promise<RuleRow[]> {
+  const res = await db.prepare(`SELECT * FROM rules ORDER BY created_at ASC`).all<RuleRow>();
+  return res.results ?? [];
+}
+
+export async function createRule(
+  db: DB,
+  r: { field: string; op: string; value: string; action: string; action_value?: string | null },
+): Promise<RuleRow> {
+  const id = crypto.randomUUID();
+  const created_at = Date.now();
+  await db
+    .prepare(
+      `INSERT INTO rules (id, field, op, value, action, action_value, enabled, created_at)
+       VALUES (?,?,?,?,?,?,1,?)`,
+    )
+    .bind(id, r.field, r.op, r.value, r.action, r.action_value ?? null, created_at)
+    .run();
+  return (await db.prepare(`SELECT * FROM rules WHERE id = ?`).bind(id).first<RuleRow>())!;
+}
+
+export async function updateRule(db: DB, id: string, enabled: 0 | 1): Promise<void> {
+  await db.prepare(`UPDATE rules SET enabled = ? WHERE id = ?`).bind(enabled, id).run();
+}
+
+export async function deleteRule(db: DB, id: string): Promise<void> {
+  await db.prepare(`DELETE FROM rules WHERE id = ?`).bind(id).run();
+}
+
+function ruleMatches(rule: RuleRow, msg: { from_addr: string; to_addr: string; subject: string }): boolean {
+  const hay = (
+    rule.field === "from" ? msg.from_addr : rule.field === "to" ? msg.to_addr : msg.subject
+  ).toLowerCase();
+  const needle = rule.value.toLowerCase();
+  switch (rule.op) {
+    case "equals":
+      return hay === needle;
+    case "startswith":
+      return hay.startsWith(needle);
+    case "endswith":
+      return hay.endsWith(needle);
+    default:
+      return hay.includes(needle);
+  }
+}
+
+/** Apply all enabled rules to one message. Returns the actions taken. */
+export async function applyRules(
+  db: DB,
+  msg: { id: string; from_addr: string; to_addr: string; subject: string },
+): Promise<void> {
+  const rules = (await db.prepare(`SELECT * FROM rules WHERE enabled = 1`).all<RuleRow>()).results ?? [];
+  for (const rule of rules) {
+    if (!ruleMatches(rule, msg)) continue;
+    switch (rule.action) {
+      case "label":
+        if (rule.action_value) {
+          await db
+            .prepare(`INSERT OR IGNORE INTO message_labels (message_id, label_id) VALUES (?,?)`)
+            .bind(msg.id, rule.action_value)
+            .run();
+        }
+        break;
+      case "archive":
+        await db.prepare(`UPDATE messages SET is_archived = 1 WHERE id = ?`).bind(msg.id).run();
+        break;
+      case "read":
+        await db.prepare(`UPDATE messages SET is_read = 1 WHERE id = ?`).bind(msg.id).run();
+        break;
+      case "trash":
+        await db.prepare(`UPDATE messages SET is_deleted = 1 WHERE id = ?`).bind(msg.id).run();
+        break;
+    }
+  }
+}
+
+/** Re-run all rules over recent inbound mail. Returns how many messages matched. */
+export async function applyRulesToExisting(db: DB): Promise<number> {
+  const rows =
+    (
+      await db
+        .prepare(
+          `SELECT id, from_addr, to_addr, subject FROM messages
+           WHERE direction = 'in' AND is_deleted = 0 ORDER BY received_at DESC LIMIT 1000`,
+        )
+        .all<{ id: string; from_addr: string; to_addr: string; subject: string | null }>()
+    ).results ?? [];
+  let touched = 0;
+  for (const m of rows) {
+    await applyRules(db, { id: m.id, from_addr: m.from_addr, to_addr: m.to_addr, subject: m.subject ?? "" });
+    touched++;
+  }
+  return touched;
 }
 
 export async function claimPendingMessage(db: DB, id: string): Promise<boolean> {
