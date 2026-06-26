@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
-import { insertOutbound } from "../db";
+import { insertOutbound, getMessage } from "../db";
 import { getReplyEnabled } from "../settings";
 
 export const reply = new Hono<HonoEnv>();
@@ -27,8 +27,16 @@ reply.post("/", async (c) => {
     return c.json({ error: "Missing fields" }, 400);
   }
 
-  const from = c.env.REPLY_FROM;
-  if (!from) return c.json({ error: "REPLY_FROM not configured" }, 500);
+  // Reply FROM the alias this thread belongs to — i.e. the alias that received
+  // the original mail (inbound `to_addr`) — not the generic REPLY_FROM address.
+  const parent = await getMessage(c.env.DB, String(messageId));
+  const aliasFrom = parent
+    ? parent.direction === "in"
+      ? parent.to_addr
+      : parent.from_addr
+    : null;
+  const from = aliasFrom || c.env.REPLY_FROM;
+  if (!from) return c.json({ error: "no sender address available" }, 500);
 
   // Undo-send flow: persist as pending; the legacy email worker's cron sends it.
   if (sendAfter) {

@@ -169,7 +169,7 @@ messages.post("/send-now", async (c) => {
   try {
     await c.env.EMAIL.send({
       to: msg.to_addr,
-      from: c.env.REPLY_FROM,
+      from: msg.from_addr || c.env.REPLY_FROM,
       subject: msg.subject ?? "(no subject)",
       html: msg.html ?? undefined,
       text: msg.text ?? "",
