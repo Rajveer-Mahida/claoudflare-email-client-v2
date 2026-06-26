@@ -177,6 +177,7 @@ export function MailDetail() {
                 m={m}
                 attachments={m.id === message.id ? attachments : []}
                 defaultOpen={i === thread.length - 1}
+                collapsible={thread.length > 1}
               />
             ))}
           </div>
@@ -221,21 +222,25 @@ function ThreadMessage({
   m,
   attachments,
   defaultOpen,
+  collapsible = true,
 }: {
   m: MessageRow;
   attachments: AttachmentRow[];
   defaultOpen: boolean;
+  collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const outbound = m.direction === "out";
   const peer = outbound ? m.to_addr : m.from_addr;
   const html = renderEmailHtml(m.html, m.id);
+  const isOpen = collapsible ? open : true;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-elevated">
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+        onClick={() => collapsible && setOpen((o) => !o)}
+        disabled={!collapsible}
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left disabled:cursor-default"
       >
         <Avatar name={m.from_name} email={peer} size={38} />
         <div className="min-w-0 flex-1">
@@ -257,7 +262,7 @@ function ThreadMessage({
       </button>
 
       <AnimatePresence initial={false}>
-        {open && (
+        {isOpen && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
