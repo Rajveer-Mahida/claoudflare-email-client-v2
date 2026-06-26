@@ -28,6 +28,9 @@ type UIState = {
 
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+
+  mobileNavOpen: boolean;
+  setMobileNav: (open: boolean) => void;
 };
 
 export const useUI = create<UIState>((set, get) => ({
@@ -52,6 +55,7 @@ export const useUI = create<UIState>((set, get) => ({
       labelId: next.labelId !== undefined ? next.labelId : s.labelId,
       q: next.q !== undefined ? next.q : s.q,
       selection: new Set<string>(),
+      mobileNavOpen: false,
     })),
 
   selection: new Set<string>(),
@@ -66,4 +70,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   sidebarCollapsed: false,
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+  mobileNavOpen: false,
+  setMobileNav: (open) => set({ mobileNavOpen: open }),
 }));

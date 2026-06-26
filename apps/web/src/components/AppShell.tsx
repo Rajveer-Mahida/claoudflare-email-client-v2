@@ -41,7 +41,7 @@ export function AppShell() {
   return (
     <div className="app-backdrop flex h-full overflow-hidden">
       <Sidebar />
-      <main className="flex min-w-0 flex-1 overflow-hidden p-2 pl-0">
+      <main className="flex min-w-0 flex-1 overflow-hidden p-2 md:pl-0">
         <div className="flex min-w-0 flex-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-md)]">
           <Outlet />
         </div>

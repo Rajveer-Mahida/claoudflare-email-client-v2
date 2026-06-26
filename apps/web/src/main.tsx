@@ -24,7 +24,7 @@ function ThemedToaster() {
   return (
     <Toaster
       theme={theme}
-      position="bottom-center"
+      position="bottom-right"
       toastOptions={{
         style: {
           background: "var(--elevated)",

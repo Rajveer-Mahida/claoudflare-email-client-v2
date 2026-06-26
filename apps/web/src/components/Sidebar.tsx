@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   LogOut,
+  X,
 } from "lucide-react";
 import type { ViewName } from "@email/shared";
 import { useUI } from "@/lib/store";
@@ -46,7 +47,17 @@ type CountShape = {
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { view, labelId, setFilter, theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useUI();
+  const {
+    view,
+    labelId,
+    setFilter,
+    theme,
+    toggleTheme,
+    sidebarCollapsed,
+    toggleSidebar,
+    mobileNavOpen,
+    setMobileNav,
+  } = useUI();
   const counts = useCounts();
   const settings = useSettings();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -81,11 +92,29 @@ export function Sidebar() {
   }
 
   return (
-    <motion.aside
-      animate={{ width: collapsed ? 76 : 264 }}
-      transition={{ type: "spring", stiffness: 300, damping: 32 }}
-      className="flex shrink-0 flex-col gap-1 p-3 pr-2"
-    >
+    <>
+      {/* Mobile scrim */}
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileNav(false)}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col gap-1 bg-bg p-3 pr-2 shadow-[var(--shadow-lg)]",
+          "transition-transform duration-300 ease-out",
+          "md:static md:z-auto md:w-auto md:translate-x-0 md:shadow-none md:transition-[width]",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full",
+          collapsed ? "md:w-[76px]" : "md:w-[264px]",
+        )}
+      >
       {/* Brand + collapse */}
       <div className="flex items-center justify-between px-2 pb-2 pt-1">
         <AnimatePresence mode="wait">
@@ -103,7 +132,10 @@ export function Sidebar() {
             </motion.div>
           )}
         </AnimatePresence>
-        <IconButton onClick={toggleSidebar} aria-label="Toggle sidebar">
+        <IconButton className="md:hidden" onClick={() => setMobileNav(false)} aria-label="Close menu">
+          <X size={18} />
+        </IconButton>
+        <IconButton className="hidden md:inline-grid" onClick={toggleSidebar} aria-label="Toggle sidebar">
           {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
         </IconButton>
       </div>
@@ -170,7 +202,10 @@ export function Sidebar() {
           collapsed={collapsed}
           icon={<Settings size={18} />}
           label="Settings"
-          onClick={() => navigate({ to: "/settings" })}
+          onClick={() => {
+            setMobileNav(false);
+            navigate({ to: "/settings" });
+          }}
         />
         <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "justify-between px-1")}>
           <Tip label={theme === "dark" ? "Light mode" : "Dark mode"}>
@@ -195,7 +230,8 @@ export function Sidebar() {
           </Tip>
         </div>
       </div>
-    </motion.aside>
+      </aside>
+    </>
   );
 }
 
