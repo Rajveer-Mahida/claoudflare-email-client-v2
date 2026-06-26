@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Send, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useReply, useCancelSend, useSettings } from "@/api/hooks";
 import { Button, Spinner } from "@/components/primitives";
-import { ApiError } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 
 const UNDO_WINDOW = 8000;
 
@@ -25,6 +26,7 @@ export function ReplyComposer({
   const reply = useReply();
   const cancelSend = useCancelSend();
   const settings = useSettings();
+  const qc = useQueryClient();
   const disabled = settings.data && !settings.data.reply_enabled;
 
   useEffect(() => {
@@ -44,12 +46,28 @@ export function ReplyComposer({
         sendAfter: Date.now() + UNDO_WINDOW,
       });
       onClose();
+
+      // Flush the send ourselves once the undo window passes — independent of any
+      // cron. send-now claims the pending row atomically, so it can't double-send
+      // with the legacy worker's cron. Undo clears the timer + cancels the row.
+      const timer = setTimeout(async () => {
+        try {
+          await api.sendNow(res.id);
+        } catch {
+          /* cron may have already claimed it */
+        }
+        qc.invalidateQueries({ queryKey: ["messages"] });
+        qc.invalidateQueries({ queryKey: ["message"] });
+        qc.invalidateQueries({ queryKey: ["counts"] });
+      }, UNDO_WINDOW);
+
       toast.success("Sending reply", {
         description: `To ${to}`,
         duration: UNDO_WINDOW,
         action: {
           label: "Undo",
           onClick: () => {
+            clearTimeout(timer);
             cancelSend.mutate(res.id);
             toast.message("Reply cancelled");
           },
