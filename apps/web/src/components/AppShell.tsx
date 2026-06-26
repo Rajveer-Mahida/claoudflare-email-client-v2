@@ -6,12 +6,34 @@ import { api, ApiError } from "@/api/client";
 import { AnimatePresence } from "framer-motion";
 import { Sidebar } from "@/components/Sidebar";
 import { Compose } from "@/components/Compose";
+import { CommandPalette } from "@/components/CommandPalette";
+import { KeyboardHelp } from "@/components/KeyboardHelp";
 import { Spinner } from "@/components/primitives";
 import { useUI } from "@/lib/store";
+import { useShortcuts } from "@/lib/useShortcuts";
 
 export function AppShell() {
   const navigate = useNavigate();
   const composeOpen = useUI((s) => s.composeOpen);
+  const { openCompose, setPalette, setHelp } = useUI();
+
+  // ⌘K / Ctrl-K toggles the command palette (works even from inputs).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette(!useUI.getState().paletteOpen);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setPalette]);
+
+  useShortcuts({
+    c: () => openCompose(),
+    "?": () => setHelp(true),
+  });
+
   const { isLoading, error } = useQuery({
     queryKey: ["auth", "me"],
     queryFn: api.me,
@@ -51,6 +73,8 @@ export function AppShell() {
         </div>
       </main>
       <AnimatePresence>{composeOpen && <Compose />}</AnimatePresence>
+      <CommandPalette />
+      <KeyboardHelp />
     </div>
   );
 }

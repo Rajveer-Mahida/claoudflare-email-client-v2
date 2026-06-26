@@ -27,6 +27,18 @@ export function MailLayout() {
   const markAllRead = useMarkAllRead();
   const labels = useLabels();
 
+  const items = messages.data?.pages.flat() ?? [];
+  const [focusedIdx, setFocusedIdx] = useState(-1);
+
+  // reset cursor when the filter changes
+  useEffect(() => setFocusedIdx(-1), [view, q, labelId, aliasFilter]);
+
+  // keep the focused row visible
+  useEffect(() => {
+    const id = items[focusedIdx]?.id;
+    if (id) document.querySelector(`[data-row="${id}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [focusedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const hasDetail = pathname.startsWith("/mail/");
@@ -38,6 +50,12 @@ export function MailLayout() {
     "g e": () => { setFilter({ view: "archived", labelId: null, q: "" }); navigate({ to: "/" }); },
     "g t": () => { setFilter({ view: "trash", labelId: null, q: "" }); navigate({ to: "/" }); },
     "g n": () => { setFilter({ view: "snoozed", labelId: null, q: "" }); navigate({ to: "/" }); },
+    j: () => setFocusedIdx((i) => Math.min((i < 0 ? -1 : i) + 1, items.length - 1)),
+    k: () => setFocusedIdx((i) => Math.max((i < 0 ? 0 : i) - 1, 0)),
+    Enter: () => {
+      const m = items[focusedIdx];
+      if (m) navigate({ to: "/mail/$id", params: { id: m.id } });
+    },
   });
 
   // debounce search into the store filter
@@ -137,7 +155,7 @@ export function MailLayout() {
             animate={{ opacity: 1 }}
             className="absolute inset-0"
           >
-            <MessageList query={messages} />
+            <MessageList query={messages} focusedId={items[focusedIdx]?.id ?? null} />
           </motion.div>
         </div>
 

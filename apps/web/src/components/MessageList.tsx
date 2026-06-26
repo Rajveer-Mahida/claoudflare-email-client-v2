@@ -9,8 +9,10 @@ import { Spinner } from "@/components/primitives";
 
 export function MessageList({
   query,
+  focusedId,
 }: {
   query: UseInfiniteQueryResult<InfiniteData<MessageListItem[]>>;
+  focusedId?: string | null;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeId = pathname.startsWith("/mail/") ? pathname.slice("/mail/".length) : null;
@@ -80,7 +82,7 @@ export function MessageList({
             exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.2 } }}
             transition={{ type: "spring", stiffness: 500, damping: 40 }}
           >
-            <MessageRow message={m} active={activeId === m.id} />
+            <MessageRow message={m} active={activeId === m.id} focused={focusedId === m.id} />
           </motion.div>
         ))}
       </AnimatePresence>

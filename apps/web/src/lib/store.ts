@@ -63,6 +63,12 @@ type UIState = {
   composeInit: ComposeInit | null;
   openCompose: (init?: ComposeInit) => void;
   closeCompose: () => void;
+
+  // command palette + keyboard help
+  paletteOpen: boolean;
+  setPalette: (open: boolean) => void;
+  helpOpen: boolean;
+  setHelp: (open: boolean) => void;
 };
 
 export const useUI = create<UIState>((set, get) => ({
@@ -123,6 +129,11 @@ export const useUI = create<UIState>((set, get) => ({
 
   composeOpen: false,
   composeInit: null,
-  openCompose: (init) => set({ composeOpen: true, composeInit: init ?? null }),
+  openCompose: (init) => set({ composeOpen: true, composeInit: init ?? null, paletteOpen: false }),
   closeCompose: () => set({ composeOpen: false, composeInit: null }),
+
+  paletteOpen: false,
+  setPalette: (open) => set({ paletteOpen: open }),
+  helpOpen: false,
+  setHelp: (open) => set({ helpOpen: open }),
 }));

@@ -7,7 +7,15 @@ import { useFlag, useMarkRead } from "@/api/hooks";
 import { Avatar } from "@/components/primitives";
 import { cn, formatRelativeTime, displayName } from "@/lib/utils";
 
-export function MessageRow({ message: m, active }: { message: MessageListItem; active: boolean }) {
+export function MessageRow({
+  message: m,
+  active,
+  focused,
+}: {
+  message: MessageListItem;
+  active: boolean;
+  focused?: boolean;
+}) {
   const navigate = useNavigate();
   const { selection, toggleSelect, view } = useUI();
   const flag = useFlag();
@@ -57,9 +65,11 @@ export function MessageRow({ message: m, active }: { message: MessageListItem; a
         style={{ x }}
         onDragEnd={onDragEnd}
         onClick={open}
+        data-row={m.id}
         className={cn(
           "group relative flex cursor-pointer items-start gap-3 rounded-xl border border-transparent bg-surface px-3 py-3 transition-colors",
           active ? "border-border-strong bg-inset" : "hover:bg-inset/70",
+          focused && !active && "ring-2 ring-accent-ring/70",
         )}
       >
         {active && (
