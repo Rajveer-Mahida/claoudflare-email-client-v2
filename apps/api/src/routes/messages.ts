@@ -10,7 +10,7 @@ import {
   listMessages,
   getMessage,
   getThread,
-  getAttachments,
+  attachmentsForMessages,
   labelsForMessages,
   markRead,
   softDelete,
@@ -57,15 +57,17 @@ messages.get("/:id", async (c) => {
   if (!message) return c.json({ error: "not found" }, 404);
 
   const threadKey = message.thread_id ?? message.message_id ?? message.id;
-  const [thread, attachments, labelMap] = await Promise.all([
-    getThread(db, threadKey),
-    getAttachments(db, id),
+  const thread = await getThread(db, threadKey);
+  const messages = thread.length ? thread : [message];
+
+  const [attachments, labelMap] = await Promise.all([
+    attachmentsForMessages(db, messages.map((m) => m.id)),
     labelsForMessages(db, [id]),
   ]);
 
   const detail: MessageDetail = {
     message,
-    thread: thread.length ? thread : [message],
+    thread: messages,
     attachments,
     labels: labelMap.get(id) ?? [],
   };

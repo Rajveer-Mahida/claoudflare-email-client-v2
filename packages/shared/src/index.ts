@@ -73,11 +73,12 @@ export type MessageListItem = Omit<MessageRow, "html" | "text"> & {
   labels: LabelRow[];
 };
 
-/** Full message detail: the message, its thread, attachments, and labels. */
+/** Full message detail: the message, its thread, per-message attachments, and labels. */
 export type MessageDetail = {
   message: MessageRow;
   thread: MessageRow[];
-  attachments: AttachmentRow[];
+  /** Attachments keyed by message id — covers every message in the thread. */
+  attachments: Record<string, AttachmentRow[]>;
   labels: LabelRow[];
 };
 

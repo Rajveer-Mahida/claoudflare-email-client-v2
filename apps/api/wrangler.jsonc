@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "smi-mail-api",
+  "name": "smi-mail",
   "main": "./src/index.ts",
   "compatibility_date": "2026-05-12",
   "workers_dev": true,

@@ -164,6 +164,23 @@ export async function getAttachments(db: DB, messageId: string): Promise<Attachm
   return res.results ?? [];
 }
 
+export async function attachmentsForMessages(
+  db: DB,
+  ids: string[],
+): Promise<Record<string, AttachmentRow[]>> {
+  const map: Record<string, AttachmentRow[]> = {};
+  if (!ids.length) return map;
+  const ph = ids.map(() => "?").join(",");
+  const res = await db
+    .prepare(`SELECT * FROM attachments WHERE message_id IN (${ph})`)
+    .bind(...ids)
+    .all<AttachmentRow>();
+  for (const a of res.results ?? []) {
+    (map[a.message_id] ??= []).push(a);
+  }
+  return map;
+}
+
 export async function getAttachmentByCid(
   db: DB,
   messageId: string,

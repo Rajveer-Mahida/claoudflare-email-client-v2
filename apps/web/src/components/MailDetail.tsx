@@ -175,7 +175,7 @@ export function MailDetail() {
               <ThreadMessage
                 key={m.id}
                 m={m}
-                attachments={m.id === message.id ? attachments : []}
+                attachments={attachments[m.id] ?? []}
                 defaultOpen={i === thread.length - 1}
                 collapsible={thread.length > 1}
               />
