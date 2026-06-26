@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "smi-mail-api",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-05-12",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+
+  // Reuse the EXISTING resources from the legacy project — same data, no migrations.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cf-email-alies",
+      "database_id": "690cfb79-5466-441c-88f4-07277934f114",
+      "migrations_dir": "../../../Email Alias Web/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "EMAIL_CACHE",
+      "bucket_name": "smi-email-cache"
+    }
+  ],
+  "send_email": [{ "name": "EMAIL" }],
+
+  "vars": {
+    "REPLY_FROM": "reply@rajveer.space",
+    "ALIAS_DOMAIN": "rajveer.space",
+    "ALIAS_DOMAINS": "rajveer.space,100xdev.qzz.io",
+    "ALIAS_SUFFIX": "smi"
+  }
+
+  // Secrets (set via `wrangler secret put`):
+  //   AUTH_SECRET    — must match legacy worker if reusing existing smi_session cookies
+  //   AUTH_PASSWORD  — login password
+  //
+  // NOTE: undo-send cron is intentionally NOT defined here — the legacy email-ingest
+  // worker remains the single owner of the `* * * * *` scheduled send to avoid double-send.
+}

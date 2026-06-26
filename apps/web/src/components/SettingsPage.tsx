@@ -1,0 +1,129 @@
+import { useNavigate } from "@tanstack/react-router";
+import * as Switch from "@radix-ui/react-switch";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette } from "lucide-react";
+import { useSettings, useSetSettings } from "@/api/hooks";
+import { useUI } from "@/lib/store";
+import { cn } from "@/lib/utils";
+
+export function SettingsPage() {
+  const navigate = useNavigate();
+  const settings = useSettings();
+  const save = useSetSettings();
+  const { theme, toggleTheme } = useUI();
+
+  const s = settings.data;
+
+  return (
+    <div className="scroll-thin h-full overflow-y-auto">
+      <div className="mx-auto max-w-2xl px-6 py-8 md:px-10">
+        <button
+          onClick={() => navigate({ to: "/" })}
+          className="mb-6 inline-flex items-center gap-2 text-sm text-muted transition hover:text-fg"
+        >
+          <ArrowLeft size={16} /> Back to inbox
+        </button>
+
+        <h1 className="mb-8 font-display text-3xl font-semibold tracking-tight">Settings</h1>
+
+        <div className="space-y-4">
+          {/* Replies */}
+          <Section icon={<Mail size={18} />} title="Replies" desc="Allow sending replies from this inbox.">
+            <Switch.Root
+              checked={!!s?.reply_enabled}
+              onCheckedChange={(v) =>
+                save.mutate(
+                  { reply_enabled: v },
+                  { onSuccess: () => toast.success(v ? "Replies enabled" : "Replies disabled") },
+                )
+              }
+              className="relative h-7 w-12 rounded-full bg-border-strong transition-colors data-[state=checked]:bg-accent"
+            >
+              <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-6" />
+            </Switch.Root>
+          </Section>
+
+          {/* Primary domain */}
+          <Section
+            icon={<Globe size={18} />}
+            title="Primary alias domain"
+            desc="Used when generating new aliases."
+            stack
+          >
+            <div className="mt-3 flex flex-wrap gap-2">
+              {s?.alias_domains.map((d) => {
+                const active = s.primary_alias_domain === d;
+                return (
+                  <button
+                    key={d}
+                    onClick={() =>
+                      save.mutate(
+                        { primary_alias_domain: d },
+                        { onSuccess: () => toast.success(`Primary domain: ${d}`) },
+                      )
+                    }
+                    className={cn(
+                      "flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-sm transition",
+                      active
+                        ? "border-accent bg-accent-soft text-accent"
+                        : "border-border text-muted hover:border-accent-ring hover:text-fg",
+                    )}
+                  >
+                    {active && <Check size={15} />}
+                    {d}
+                  </button>
+                );
+              })}
+            </div>
+          </Section>
+
+          {/* Appearance */}
+          <Section icon={<Palette size={18} />} title="Appearance" desc="Switch between light and dark.">
+            <button
+              onClick={toggleTheme}
+              className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm transition hover:border-accent-ring"
+            >
+              {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
+              {theme === "dark" ? "Dark" : "Light"}
+            </button>
+          </Section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  icon,
+  title,
+  desc,
+  children,
+  stack,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  children: React.ReactNode;
+  stack?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-border bg-elevated p-5"
+    >
+      <div className={cn("flex gap-4", !stack && "items-center")}>
+        <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-inset text-muted">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-medium">{title}</h3>
+          <p className="text-sm text-muted">{desc}</p>
+          {stack && children}
+        </div>
+        {!stack && <div className="shrink-0">{children}</div>}
+      </div>
+    </motion.div>
+  );
+}

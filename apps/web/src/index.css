@@ -1,0 +1,215 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Aria Mail — "warm editorial" design language.
+   Paper-warm light theme · deep-ink warm dark theme · burnt-amber accent.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* surfaces */
+  --bg: #f4f1ea;
+  --surface: #fbf9f4;
+  --elevated: #ffffff;
+  --inset: #efebe1;
+
+  /* text */
+  --fg: #1c1a16;
+  --muted: #6c6557;
+  --faint: #9a9283;
+
+  /* lines */
+  --border: #e4ded1;
+  --border-strong: #d6cfbe;
+
+  /* accent — burnt amber / marigold */
+  --accent: #b4632a;
+  --accent-hover: #9a5221;
+  --accent-fg: #fdf8f1;
+  --accent-soft: #f3e7d6;
+  --accent-ring: #d99b5e;
+
+  /* semantics */
+  --star: #d99e2b;
+  --danger: #b3431f;
+  --success: #4f7a3a;
+
+  /* depth */
+  --shadow-sm: 0 1px 2px -1px rgb(40 32 20 / 0.10), 0 1px 1px rgb(40 32 20 / 0.04);
+  --shadow-md: 0 8px 24px -8px rgb(40 32 20 / 0.18), 0 2px 6px -2px rgb(40 32 20 / 0.08);
+  --shadow-lg: 0 24px 60px -16px rgb(30 24 14 / 0.28);
+
+  --radius: 0.7rem;
+}
+
+.dark {
+  --bg: #14120e;
+  --surface: #1b1813;
+  --elevated: #221e18;
+  --inset: #110f0b;
+
+  --fg: #f1ece2;
+  --muted: #a39b8a;
+  --faint: #756d5d;
+
+  --border: #2e281f;
+  --border-strong: #3a3328;
+
+  --accent: #e0a25a;
+  --accent-hover: #ecb274;
+  --accent-fg: #1a140b;
+  --accent-soft: #2a2117;
+  --accent-ring: #8a663a;
+
+  --star: #e8b53e;
+  --danger: #e3744f;
+  --success: #8fb96f;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 10px 30px -10px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 30px 70px -20px rgb(0 0 0 / 0.75);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-inset: var(--inset);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ring: var(--accent-ring);
+  --color-star: var(--star);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-lg: var(--radius);
+  --shadow-soft: var(--shadow-md);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    overscroll-behavior: none;
+  }
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--fg);
+  }
+
+  /* Warm grain + subtle radial glow on the app backdrop */
+  .app-backdrop {
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(120% 100% at 100% 0%, color-mix(in oklab, var(--accent) 7%, transparent) 0%, transparent 55%),
+      radial-gradient(90% 90% at 0% 100%, color-mix(in oklab, var(--accent) 4%, transparent) 0%, transparent 50%);
+  }
+
+  /* Custom scrollbars */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--faint);
+    background-clip: content-box;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  /* Render sanitized email HTML in a contained, readable frame */
+  .email-html {
+    line-height: 1.6;
+    word-break: break-word;
+  }
+  .email-html a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .email-html img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+  }
+  .email-html blockquote {
+    border-left: 3px solid var(--border-strong);
+    padding-left: 1rem;
+    color: var(--muted);
+    margin: 0.5rem 0;
+  }
+  .email-html table {
+    max-width: 100%;
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--inset);
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--fg) 6%, transparent),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

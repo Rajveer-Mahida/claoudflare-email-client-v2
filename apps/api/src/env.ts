@@ -1,0 +1,24 @@
+export interface SendEmailBinding {
+  send(opts: {
+    to: string;
+    from: string;
+    subject: string;
+    html?: string;
+    text?: string;
+  }): Promise<{ messageId: string }>;
+}
+
+export type Env = {
+  DB: D1Database;
+  EMAIL_CACHE: R2Bucket;
+  EMAIL: SendEmailBinding;
+  REPLY_FROM: string;
+  ALIAS_DOMAIN?: string;
+  ALIAS_DOMAINS?: string;
+  ALIAS_SUFFIX?: string;
+  AUTH_SECRET?: string;
+  AUTH_PASSWORD?: string;
+};
+
+/** Hono context env shape. */
+export type HonoEnv = { Bindings: Env };
