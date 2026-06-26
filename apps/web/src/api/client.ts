@@ -125,6 +125,13 @@ export const api = {
     req<DraftRow>("/api/drafts", body(data)),
   deleteDraft: (id: string) =>
     req<{ ok: true }>(`/api/drafts/${id}`, { method: "DELETE" }),
+  // push
+  getPushKey: () => req<{ key: string }>("/api/push/key"),
+  pushSubscribe: (sub: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }) =>
+    req<{ ok: true }>("/api/push/subscribe", body(sub)),
+  pushUnsubscribe: (endpoint: string) =>
+    req<{ ok: true }>("/api/push/unsubscribe", body({ endpoint })),
+
   // rules
   listRules: () => req<RuleRow[]>("/api/rules"),
   createRule: (data: {

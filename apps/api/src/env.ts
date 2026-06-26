@@ -35,6 +35,10 @@ export type Env = {
   ALIAS_PATTERN?: string;
   FORWARD_TO?: string;
   FALLBACK_FORWARD_TO?: string;
+  // web push (VAPID)
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_SUBJECT?: string;
+  VAPID_PRIVATE_JWK?: string;
 };
 
 /** Hono context env shape. */

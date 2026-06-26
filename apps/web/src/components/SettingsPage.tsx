@@ -3,11 +3,12 @@ import { useNavigate } from "@tanstack/react-router";
 import * as Switch from "@radix-ui/react-switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine, ShieldCheck, Bell } from "lucide-react";
 import { useSettings, useSetSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
-import { Button } from "@/components/primitives";
+import { Button, Spinner } from "@/components/primitives";
 import { RulesManager } from "@/components/RulesManager";
+import { pushSupported, pushEnabled, enablePush, disablePush } from "@/lib/push";
 import { cn } from "@/lib/utils";
 
 export function SettingsPage() {
@@ -150,6 +151,15 @@ export function SettingsPage() {
             </div>
           </Section>
 
+          {/* Notifications */}
+          <Section
+            icon={<Bell size={18} />}
+            title="New-mail notifications"
+            desc="Get a desktop/mobile push when mail arrives. Install the app for best results."
+          >
+            <NotificationsToggle />
+          </Section>
+
           <RulesManager />
         </div>
       </div>
@@ -188,5 +198,42 @@ function Section({
         {!stack && <div className="shrink-0">{children}</div>}
       </div>
     </motion.div>
+  );
+}
+
+function NotificationsToggle() {
+  const [supported] = useState(() => pushSupported());
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    pushEnabled().then(setEnabled);
+  }, []);
+
+  if (!supported) return <span className="text-sm text-faint">Not supported here</span>;
+
+  async function toggle() {
+    setBusy(true);
+    try {
+      if (enabled) {
+        await disablePush();
+        setEnabled(false);
+        toast.success("Notifications off");
+      } else {
+        const ok = await enablePush();
+        setEnabled(ok);
+        ok ? toast.success("Notifications on") : toast.error("Permission denied");
+      }
+    } catch (e) {
+      toast.error((e as Error).message || "Failed");
+    }
+    setBusy(false);
+  }
+
+  return (
+    <Button variant={enabled ? "soft" : "primary"} size="sm" onClick={toggle} disabled={busy}>
+      {busy ? <Spinner /> : <Bell size={15} />}
+      {enabled ? "Disable" : "Enable"}
+    </Button>
   );
 }

@@ -5,13 +5,14 @@
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
 import { registerAlias, isAliasDisabled, applyRules } from "./db";
+import { notifyNewMail } from "./push";
 
 const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
 
 export async function handleEmail(
   message: ForwardableEmailMessage,
   env: Env,
-  _ctx: ExecutionContext,
+  ctx: ExecutionContext,
 ): Promise<void> {
   const recipient = message.to.toLowerCase();
   const pattern = new RegExp(env.ALIAS_PATTERN ?? DEFAULT_PATTERN, "i");
@@ -85,6 +86,9 @@ export async function handleEmail(
     to_addr: recipient,
     subject: parsed.subject ?? "",
   });
+
+  // Fire a new-mail push (best-effort, doesn't block delivery).
+  ctx.waitUntil(notifyNewMail(env));
 
   for (const att of parsed.attachments ?? []) {
     const aid = crypto.randomUUID();
