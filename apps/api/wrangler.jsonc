@@ -3,6 +3,7 @@
   "name": "smi-mail-api",
   "main": "./src/index.ts",
   "compatibility_date": "2026-05-12",
+  "workers_dev": true,
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
   "upload_source_maps": true,
@@ -35,17 +36,18 @@
   ],
   "send_email": [{ "name": "EMAIL" }],
 
+  // Undo-send cron — this worker is now the SINGLE owner (legacy workers deleted).
+  "triggers": { "crons": ["* * * * *"] },
+
   "vars": {
     "REPLY_FROM": "reply@rajveer.space",
     "ALIAS_DOMAIN": "rajveer.space",
     "ALIAS_DOMAINS": "rajveer.space,100xdev.qzz.io",
-    "ALIAS_SUFFIX": "smi"
+    "ALIAS_SUFFIX": "smi",
+    "ALIAS_PATTERN": "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$",
+    "FORWARD_TO": "rajveer.mahida@groovyweb.co",
+    "FALLBACK_FORWARD_TO": "rajveermahida.dev@gmail.com"
   }
 
-  // Secrets (set via `wrangler secret put`):
-  //   AUTH_SECRET    — must match legacy worker if reusing existing smi_session cookies
-  //   AUTH_PASSWORD  — login password
-  //
-  // NOTE: undo-send cron is intentionally NOT defined here — the legacy email-ingest
-  // worker remains the single owner of the `* * * * *` scheduled send to avoid double-send.
+  // Secrets (set via `wrangler secret put`): AUTH_SECRET, AUTH_PASSWORD
 }

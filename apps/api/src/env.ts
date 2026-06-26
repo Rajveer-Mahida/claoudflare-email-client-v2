@@ -18,6 +18,10 @@ export type Env = {
   ALIAS_SUFFIX?: string;
   AUTH_SECRET?: string;
   AUTH_PASSWORD?: string;
+  // inbound email ingestion
+  ALIAS_PATTERN?: string;
+  FORWARD_TO?: string;
+  FALLBACK_FORWARD_TO?: string;
 };
 
 /** Hono context env shape. */

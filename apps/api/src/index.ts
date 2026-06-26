@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import type { HonoEnv } from "./env";
+import type { HonoEnv, Env } from "./env";
 import { verifySessionToken, cookieName } from "./auth";
+import { handleEmail } from "./email-handler";
+import { runScheduled } from "./scheduled";
 import { auth } from "./routes/auth";
 import { messages } from "./routes/messages";
 import { labels, counts } from "./routes/labels";
@@ -40,4 +42,13 @@ app.get("/api/health", (c) => c.json({ ok: true }));
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 
-export default app;
+// Single worker: HTTP (SPA + API) via Hono, plus inbound email + undo-send cron.
+export default {
+  fetch: app.fetch,
+  async email(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
+    await handleEmail(message, env, ctx);
+  },
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runScheduled(env));
+  },
+};
