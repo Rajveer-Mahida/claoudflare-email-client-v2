@@ -48,6 +48,52 @@ function viewWhere(view: ViewName, now: number): { where: string; args: unknown[
   }
 }
 
+type SearchParsed = {
+  free: string;
+  from: string[];
+  to: string[];
+  subject: string[];
+  hasAttachment: boolean;
+  isUnread: boolean;
+  isRead: boolean;
+  isStarred: boolean;
+};
+
+/** Parse Gmail-style operators (from:, to:, subject:, has:attachment, is:unread|read|starred). */
+function parseSearch(q: string): SearchParsed {
+  const out: SearchParsed = {
+    free: "",
+    from: [],
+    to: [],
+    subject: [],
+    hasAttachment: false,
+    isUnread: false,
+    isRead: false,
+    isStarred: false,
+  };
+  const freeParts: string[] = [];
+  const re = /(\w+):"([^"]+)"|(\w+):(\S+)|"([^"]+)"|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(q)) !== null) {
+    const key = (m[1] || m[3])?.toLowerCase();
+    const val = m[2] ?? m[4];
+    if (key && val !== undefined) {
+      const v = val.toLowerCase();
+      if (key === "from") out.from.push(val);
+      else if (key === "to") out.to.push(val);
+      else if (key === "subject") out.subject.push(val);
+      else if (key === "has" && v.startsWith("attach")) out.hasAttachment = true;
+      else if (key === "is" && v === "unread") out.isUnread = true;
+      else if (key === "is" && v === "read") out.isRead = true;
+      else if (key === "is" && v === "starred") out.isStarred = true;
+      else freeParts.push(`${key}:${val}`);
+    } else if (m[5] !== undefined) freeParts.push(m[5]);
+    else if (m[6] !== undefined) freeParts.push(m[6]);
+  }
+  out.free = freeParts.join(" ").trim();
+  return out;
+}
+
 export async function listMessages(
   db: DB,
   opts: {
@@ -63,59 +109,65 @@ export async function listMessages(
   const offset = opts.offset ?? 0;
   const view = opts.view ?? "inbox";
   const now = Date.now();
-  const { where, args } = viewWhere(view, now);
 
-  // Optional "scope to one alias" filter (uses m.to_addr in joined queries).
-  const toClause = opts.to ? " AND to_addr = ?" : "";
-  const toClauseM = opts.to ? " AND m.to_addr = ?" : "";
-  const toArgs = opts.to ? [opts.to] : [];
+  const joins: string[] = [];
+  const whereParts: string[] = [];
+  const whereArgs: unknown[] = [];
 
+  // Scope: a label (across views) or the current view's predicate.
   if (opts.labelId) {
-    if (opts.q?.trim()) {
-      const term = opts.q.trim().replace(/"/g, '""');
-      const res = await db
-        .prepare(
-          `SELECT m.* FROM messages m
-           JOIN messages_fts f ON f.rowid = m.rowid
-           JOIN message_labels ml ON ml.message_id = m.id
-           WHERE messages_fts MATCH ? AND ml.label_id = ? AND m.is_deleted = 0${toClauseM}
-           ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
-        )
-        .bind(`"${term}"*`, opts.labelId, ...toArgs, limit, offset)
-        .all<MessageRow>();
-      return res.results ?? [];
+    joins.push("JOIN message_labels ml ON ml.message_id = m.id");
+    whereParts.push("m.is_deleted = 0", "ml.label_id = ?");
+    whereArgs.push(opts.labelId);
+  } else {
+    const { where, args } = viewWhere(view, now);
+    whereParts.push(where);
+    whereArgs.push(...args);
+  }
+
+  // Free-text + operator search.
+  const s = opts.q?.trim() ? parseSearch(opts.q) : null;
+  if (s?.free) {
+    joins.push("JOIN messages_fts f ON f.rowid = m.rowid");
+    const term = s.free
+      .split(/\s+/)
+      .map((t) => `"${t.replace(/"/g, '""')}"*`)
+      .join(" ");
+    whereParts.push("messages_fts MATCH ?");
+    whereArgs.push(term);
+  }
+  if (s) {
+    for (const v of s.from) {
+      whereParts.push("m.from_addr LIKE ?");
+      whereArgs.push(`%${v}%`);
     }
-    const res = await db
-      .prepare(
-        `SELECT m.* FROM messages m
-         JOIN message_labels ml ON ml.message_id = m.id
-         WHERE ml.label_id = ? AND m.is_deleted = 0${toClauseM}
-         ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
-      )
-      .bind(opts.labelId, ...toArgs, limit, offset)
-      .all<MessageRow>();
-    return res.results ?? [];
+    for (const v of s.to) {
+      whereParts.push("m.to_addr LIKE ?");
+      whereArgs.push(`%${v}%`);
+    }
+    for (const v of s.subject) {
+      whereParts.push("m.subject LIKE ?");
+      whereArgs.push(`%${v}%`);
+    }
+    if (s.hasAttachment)
+      whereParts.push("EXISTS (SELECT 1 FROM attachments a WHERE a.message_id = m.id)");
+    if (s.isUnread) whereParts.push("m.is_read = 0");
+    if (s.isRead) whereParts.push("m.is_read = 1");
+    if (s.isStarred) whereParts.push("m.is_starred = 1");
   }
 
-  if (opts.q?.trim()) {
-    const term = opts.q.trim().replace(/"/g, '""');
-    const res = await db
-      .prepare(
-        `SELECT m.* FROM messages m
-         JOIN messages_fts f ON f.rowid = m.rowid
-         WHERE messages_fts MATCH ? AND ${where}${toClauseM}
-         ORDER BY m.received_at DESC LIMIT ? OFFSET ?`,
-      )
-      .bind(`"${term}"*`, ...args, ...toArgs, limit, offset)
-      .all<MessageRow>();
-    return res.results ?? [];
+  // Scope to one alias (alias filter — exact match).
+  if (opts.to) {
+    whereParts.push("m.to_addr = ?");
+    whereArgs.push(opts.to);
   }
 
+  const sql = `SELECT m.* FROM messages m ${joins.join(" ")}
+     WHERE ${whereParts.join(" AND ")}
+     ORDER BY m.received_at DESC LIMIT ? OFFSET ?`;
   const res = await db
-    .prepare(
-      `SELECT * FROM messages WHERE ${where}${toClause} ORDER BY received_at DESC LIMIT ? OFFSET ?`,
-    )
-    .bind(...args, ...toArgs, limit, offset)
+    .prepare(sql)
+    .bind(...whereArgs, limit, offset)
     .all<MessageRow>();
   return res.results ?? [];
 }

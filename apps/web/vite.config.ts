@@ -13,6 +13,27 @@ export default defineConfig({
       ),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          router: ["@tanstack/react-router", "@tanstack/react-query"],
+          motion: ["framer-motion"],
+          radix: [
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-tooltip",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-avatar",
+            "@radix-ui/react-scroll-area",
+            "@radix-ui/react-separator",
+          ],
+          vendor: ["dompurify", "sonner", "lucide-react", "zustand"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

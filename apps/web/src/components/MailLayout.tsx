@@ -107,7 +107,7 @@ export function MailLayout() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Search mail"
+              placeholder="Search · from: subject: has:attachment is:unread"
               className="h-10 w-full rounded-full border border-border bg-bg pl-10 pr-9 text-sm outline-none transition focus:border-accent-ring focus:ring-4 focus:ring-accent-ring/15"
             />
             {draft && (
@@ -144,7 +144,7 @@ export function MailLayout() {
         <div className="border-t border-border px-4 py-2 text-center text-[11px] text-faint">
           {selection.size > 0
             ? `${selection.size} selected`
-            : `${messages.data?.length ?? 0} conversations`}
+            : `${messages.data?.pages.flat().length ?? 0} loaded`}
         </div>
       </section>
 

@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import {
   createRootRoute,
   createRoute,
@@ -6,19 +7,45 @@ import {
 } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { MailLayout } from "@/components/MailLayout";
-import { MailDetail } from "@/components/MailDetail";
 import { EmptyDetail } from "@/components/EmptyDetail";
-import { LoginPage } from "@/components/LoginPage";
-import { SettingsPage } from "@/components/SettingsPage";
-import { DraftsPage } from "@/components/DraftsPage";
-import { AliasesPage } from "@/components/AliasesPage";
+import { Spinner } from "@/components/primitives";
+
+// Code-split the heavier leaf pages into their own chunks.
+const named = <T extends Record<string, ComponentType<unknown>>>(
+  loader: () => Promise<T>,
+  key: keyof T,
+) => lazy(() => loader().then((m) => ({ default: m[key] })));
+
+const MailDetail = named(() => import("@/components/MailDetail"), "MailDetail");
+const LoginPage = named(() => import("@/components/LoginPage"), "LoginPage");
+const SettingsPage = named(() => import("@/components/SettingsPage"), "SettingsPage");
+const DraftsPage = named(() => import("@/components/DraftsPage"), "DraftsPage");
+const AliasesPage = named(() => import("@/components/AliasesPage"), "AliasesPage");
+
+function Lazy({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="grid h-full place-items-center">
+          <Spinner className="text-accent" />
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  component: LoginPage,
+  component: () => (
+    <Lazy>
+      <LoginPage />
+    </Lazy>
+  ),
 });
 
 const shellRoute = createRoute({
@@ -42,25 +69,41 @@ const indexRoute = createRoute({
 const mailRoute = createRoute({
   getParentRoute: () => mailLayoutRoute,
   path: "/mail/$id",
-  component: MailDetail,
+  component: () => (
+    <Lazy>
+      <MailDetail />
+    </Lazy>
+  ),
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/settings",
-  component: SettingsPage,
+  component: () => (
+    <Lazy>
+      <SettingsPage />
+    </Lazy>
+  ),
 });
 
 const draftsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/drafts",
-  component: DraftsPage,
+  component: () => (
+    <Lazy>
+      <DraftsPage />
+    </Lazy>
+  ),
 });
 
 const aliasesRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/aliases",
-  component: AliasesPage,
+  component: () => (
+    <Lazy>
+      <AliasesPage />
+    </Lazy>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([

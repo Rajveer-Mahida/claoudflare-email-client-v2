@@ -1,11 +1,15 @@
 import {
   useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
   type QueryClient,
+  type InfiniteData,
 } from "@tanstack/react-query";
 import type { MessageListItem, ViewName, FlagField } from "@email/shared";
 import { api } from "./client";
+
+const PAGE = 50;
 
 // ── query keys ───────────────────────────────────────────────────────────────
 export const qk = {
@@ -31,11 +35,14 @@ export function useSettings() {
 }
 
 export function useMessages(view: ViewName, q: string, labelId: string | null, to: string | null = null) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: qk.messages(view, q, labelId, to),
-    queryFn: () => api.messages({ view, q, label: labelId, to }),
+    queryFn: ({ pageParam }) =>
+      api.messages({ view, q, label: labelId, to, limit: PAGE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE ? allPages.length * PAGE : undefined,
     refetchInterval: 30_000,
-    placeholderData: (prev) => prev,
   });
 }
 
@@ -119,8 +126,8 @@ function eachMessageList(
   qc: QueryClient,
   fn: (list: MessageListItem[]) => MessageListItem[],
 ) {
-  qc.setQueriesData<MessageListItem[]>({ queryKey: ["messages"] }, (old) =>
-    old ? fn(old) : old,
+  qc.setQueriesData<InfiniteData<MessageListItem[]>>({ queryKey: ["messages"] }, (old) =>
+    old ? { ...old, pages: old.pages.map((p) => fn(p)) } : old,
   );
 }
 

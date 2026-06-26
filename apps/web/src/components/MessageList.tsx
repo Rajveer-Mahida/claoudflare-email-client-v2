@@ -1,13 +1,36 @@
+import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import type { UseQueryResult } from "@tanstack/react-query";
+import type { UseInfiniteQueryResult, InfiniteData } from "@tanstack/react-query";
 import type { MessageListItem } from "@email/shared";
 import { Inbox } from "lucide-react";
 import { MessageRow } from "@/components/MessageRow";
+import { Spinner } from "@/components/primitives";
 
-export function MessageList({ query }: { query: UseQueryResult<MessageListItem[]> }) {
+export function MessageList({
+  query,
+}: {
+  query: UseInfiniteQueryResult<InfiniteData<MessageListItem[]>>;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activeId = pathname.startsWith("/mail/") ? pathname.slice("/mail/".length) : null;
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const sentinel = useRef<HTMLDivElement>(null);
+
+  // Load more when the sentinel scrolls into view.
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
+      },
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (query.isLoading) {
     return (
@@ -25,7 +48,7 @@ export function MessageList({ query }: { query: UseQueryResult<MessageListItem[]
     );
   }
 
-  const items = query.data ?? [];
+  const items = query.data?.pages.flat() ?? [];
 
   if (items.length === 0) {
     return (
@@ -53,7 +76,7 @@ export function MessageList({ query }: { query: UseQueryResult<MessageListItem[]
             key={m.id}
             layout
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.015, 0.2) } }}
+            animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.01, 0.15) } }}
             exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.2 } }}
             transition={{ type: "spring", stiffness: 500, damping: 40 }}
           >
@@ -61,6 +84,14 @@ export function MessageList({ query }: { query: UseQueryResult<MessageListItem[]
           </motion.div>
         ))}
       </AnimatePresence>
+
+      {/* infinite-scroll sentinel + loader */}
+      <div ref={sentinel} className="h-8" />
+      {isFetchingNextPage && (
+        <div className="grid place-items-center py-3 text-muted">
+          <Spinner className="text-accent" />
+        </div>
+      )}
     </div>
   );
 }
