@@ -23,6 +23,7 @@ import { useUI } from "@/lib/store";
 import { useCounts, useSettings } from "@/api/hooks";
 import { api } from "@/api/client";
 import { randomAlias } from "@/lib/alias";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { IconButton, Tip } from "@/components/primitives";
 
@@ -63,7 +64,9 @@ export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onSettings = pathname === "/settings";
 
-  const collapsed = sidebarCollapsed;
+  // Collapse only applies on desktop; the mobile drawer is always full-width.
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const collapsed = sidebarCollapsed && isDesktop;
 
   function go(v: ViewName) {
     setFilter({ view: v, labelId: null, q: "" });
@@ -112,7 +115,7 @@ export function Sidebar() {
           "transition-transform duration-300 ease-out",
           "md:static md:z-auto md:w-auto md:translate-x-0 md:shadow-none md:transition-[width]",
           mobileNavOpen ? "translate-x-0" : "-translate-x-full",
-          collapsed ? "md:w-[76px]" : "md:w-[264px]",
+          sidebarCollapsed ? "md:w-[76px]" : "md:w-[264px]",
         )}
       >
       {/* Brand + collapse */}
