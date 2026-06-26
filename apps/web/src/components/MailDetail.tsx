@@ -13,9 +13,12 @@ import {
   Reply as ReplyIcon,
   Paperclip,
   Download,
+  Sun,
+  Moon,
 } from "lucide-react";
 import type { MessageRow, AttachmentRow } from "@email/shared";
 import { useMessage, useFlag, useMarkRead, useSnooze, useSoftDelete } from "@/api/hooks";
+import { useUI } from "@/lib/store";
 import { Avatar, IconButton, Tip, Spinner } from "@/components/primitives";
 import { SnoozeMenu } from "@/components/SnoozeMenu";
 import { LabelMenu } from "@/components/LabelMenu";
@@ -32,6 +35,7 @@ export function MailDetail() {
   const markRead = useMarkRead();
   const snooze = useSnooze();
   const del = useSoftDelete();
+  const { emailTheme, toggleEmailTheme } = useUI();
   const [replying, setReplying] = useState(false);
 
   function back() {
@@ -142,6 +146,11 @@ export function MailDetail() {
         </Tip>
 
         <div className="ml-auto flex items-center gap-1">
+          <Tip label={emailTheme === "dark" ? "Light email" : "Dark email"}>
+            <IconButton onClick={toggleEmailTheme} aria-label="Toggle email theme">
+              {emailTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </IconButton>
+          </Tip>
           <IconButton
             active={!!message.is_starred}
             onClick={() => flag.mutate({ ids: [id], field: "is_starred", value: message.is_starred ? 0 : 1 })}
@@ -230,6 +239,7 @@ function ThreadMessage({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const emailTheme = useUI((s) => s.emailTheme);
   const outbound = m.direction === "out";
   const peer = outbound ? m.to_addr : m.from_addr;
   const html = renderEmailHtml(m.html, m.id);
@@ -270,7 +280,11 @@ function ThreadMessage({
             transition={{ duration: 0.2 }}
           >
             <div className="border-t border-border p-3 md:p-4">
-              <div className="email-surface overflow-x-auto rounded-xl">
+              <div
+                className={`email-surface overflow-x-auto rounded-xl${
+                  emailTheme === "dark" ? " is-dark" : ""
+                }`}
+              >
                 {/* w-fit + min-w-full centers narrow emails and lets wide ones expand + scroll */}
                 <div className="mx-auto w-fit min-w-full px-4 py-4">
                   {html ? (

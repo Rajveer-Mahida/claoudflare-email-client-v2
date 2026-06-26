@@ -166,6 +166,16 @@
     --border-strong: #d4d4d4;
   }
 
+  /* Dark reading mode: invert the whole surface (white bg → near-black, dark
+     text → light), preserving hues, then re-invert media so photos/logos stay
+     normal. Readable for any email regardless of its authored colors. */
+  .email-surface.is-dark {
+    filter: invert(0.92) hue-rotate(180deg);
+  }
+  .email-surface.is-dark :is(img, video, svg, picture, iframe, [style*="background-image"]) {
+    filter: invert(1) hue-rotate(180deg);
+  }
+
   /* Render sanitized email HTML in a contained, readable frame */
   .email-html {
     line-height: 1.6;

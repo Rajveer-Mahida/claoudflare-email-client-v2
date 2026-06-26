@@ -10,9 +10,21 @@ function initialTheme(): Theme {
   return "light";
 }
 
+function initialEmailTheme(): Theme {
+  try {
+    return localStorage.getItem("aria-email-theme") === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+}
+
 type UIState = {
   theme: Theme;
   toggleTheme: () => void;
+
+  // reading-pane-only theme for email content (separate from app theme)
+  emailTheme: Theme;
+  toggleEmailTheme: () => void;
 
   // current list filter
   view: ViewName;
@@ -44,6 +56,17 @@ export const useUI = create<UIState>((set, get) => ({
       /* ignore */
     }
     set({ theme: next });
+  },
+
+  emailTheme: initialEmailTheme(),
+  toggleEmailTheme: () => {
+    const next: Theme = get().emailTheme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem("aria-email-theme", next);
+    } catch {
+      /* ignore */
+    }
+    set({ emailTheme: next });
   },
 
   view: "inbox",
