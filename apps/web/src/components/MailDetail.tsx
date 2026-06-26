@@ -154,7 +154,7 @@ export function MailDetail() {
 
       {/* scroll body */}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-5 py-6 md:px-8">
+        <div className="w-full px-3 py-6 md:px-6">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {labels.map((l) => (
               <span
@@ -265,14 +265,17 @@ function ThreadMessage({
             transition={{ duration: 0.2 }}
           >
             <div className="border-t border-border p-3 md:p-4">
-              <div className="email-surface overflow-x-auto rounded-xl px-4 py-4">
-                {html ? (
-                  <div className="email-html text-[14px]" dangerouslySetInnerHTML={{ __html: html }} />
-                ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-[14px] leading-relaxed text-inherit">
-                    {m.text}
-                  </pre>
-                )}
+              <div className="email-surface overflow-x-auto rounded-xl">
+                {/* w-fit + min-w-full centers narrow emails and lets wide ones expand + scroll */}
+                <div className="mx-auto w-fit min-w-full px-4 py-4">
+                  {html ? (
+                    <div className="email-html text-[14px]" dangerouslySetInnerHTML={{ __html: html }} />
+                  ) : (
+                    <pre className="whitespace-pre-wrap font-sans text-[14px] leading-relaxed text-inherit">
+                      {m.text}
+                    </pre>
+                  )}
+                </div>
               </div>
 
               {attachments.length > 0 && (
