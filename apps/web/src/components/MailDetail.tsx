@@ -264,15 +264,19 @@ function ThreadMessage({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="border-t border-border px-4 py-4">
-              {html ? (
-                <div className="email-html text-[14px]" dangerouslySetInnerHTML={{ __html: html }} />
-              ) : (
-                <pre className="whitespace-pre-wrap font-sans text-[14px] leading-relaxed">{m.text}</pre>
-              )}
+            <div className="border-t border-border p-3 md:p-4">
+              <div className="email-surface overflow-x-auto rounded-xl px-4 py-4">
+                {html ? (
+                  <div className="email-html text-[14px]" dangerouslySetInnerHTML={{ __html: html }} />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans text-[14px] leading-relaxed text-inherit">
+                    {m.text}
+                  </pre>
+                )}
+              </div>
 
               {attachments.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {attachments.map((a) => (
                     <AttachmentPill key={a.id} a={a} />
                   ))}

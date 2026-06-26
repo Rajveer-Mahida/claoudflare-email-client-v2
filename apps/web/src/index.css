@@ -156,6 +156,16 @@
   .text-balance {
     text-wrap: balance;
   }
+  /* Email bodies are authored for light backgrounds — always render them on a
+     light surface so dark-mode never swallows dark email text. */
+  .email-surface {
+    background: #ffffff;
+    color: #1a1a1a;
+    --fg: #1a1a1a;
+    --muted: #555555;
+    --border-strong: #d4d4d4;
+  }
+
   /* Render sanitized email HTML in a contained, readable frame */
   .email-html {
     line-height: 1.6;
