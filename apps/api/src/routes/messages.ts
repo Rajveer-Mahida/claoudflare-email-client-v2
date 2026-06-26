@@ -11,6 +11,7 @@ import {
   getMessage,
   getThread,
   attachmentsForMessages,
+  getAttachments,
   labelsForMessages,
   markRead,
   softDelete,
@@ -169,13 +170,35 @@ messages.post("/send-now", async (c) => {
     return c.json({ error: "Replies disabled in settings" }, 403);
   }
 
+  const splitAddrs = (s: string | null) =>
+    (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+
   try {
+    // Pull stored attachment blobs back from R2 so compose attachments deliver.
+    const atts = await getAttachments(c.env.DB, id);
+    const attachments = [];
+    for (const a of atts) {
+      const obj = await c.env.EMAIL_CACHE.get(a.r2_key);
+      if (!obj) continue;
+      attachments.push({
+        content: await obj.arrayBuffer(),
+        filename: a.filename ?? "file",
+        type: a.mime_type ?? "application/octet-stream",
+        disposition: "attachment" as const,
+      });
+    }
+    const cc = splitAddrs(msg.cc);
+    const bcc = splitAddrs(msg.bcc);
+
     await c.env.EMAIL.send({
-      to: msg.to_addr,
+      to: splitAddrs(msg.to_addr),
+      cc: cc.length ? cc : undefined,
+      bcc: bcc.length ? bcc : undefined,
       from: msg.from_addr || c.env.REPLY_FROM,
       subject: msg.subject ?? "(no subject)",
       html: msg.html ?? undefined,
       text: msg.text ?? "",
+      attachments: attachments.length ? attachments : undefined,
     });
     await markMessageSent(c.env.DB, id);
     return c.json({ ok: true });
