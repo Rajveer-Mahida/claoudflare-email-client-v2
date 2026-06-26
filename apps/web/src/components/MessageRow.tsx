@@ -69,27 +69,34 @@ export function MessageRow({ message: m, active }: { message: MessageListItem; a
           />
         )}
 
-        {/* avatar / checkbox */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleSelect(m.id);
-          }}
-          className="relative shrink-0"
-          aria-label="Select"
-        >
-          <span className={cn("block transition-opacity", selected && "opacity-0")}>
-            <Avatar name={m.from_name} email={peer} size={40} />
-          </span>
-          <span
+        {/* checkbox slides in beside the avatar (hover or while selecting) */}
+        <div className="flex shrink-0 items-center">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSelect(m.id);
+            }}
+            aria-label="Select"
             className={cn(
-              "absolute inset-0 grid place-items-center rounded-full bg-accent text-accent-fg transition-all",
-              selected ? "scale-100 opacity-100" : "scale-75 opacity-0 group-hover:opacity-60",
+              "grid place-items-center overflow-hidden transition-[width,margin,opacity] duration-200 ease-out",
+              selected || selectMode
+                ? "w-7 mr-2 opacity-100"
+                : "w-0 opacity-0 group-hover:w-7 group-hover:mr-2 group-hover:opacity-100",
             )}
           >
-            <Check size={18} />
-          </span>
-        </button>
+            <span
+              className={cn(
+                "grid h-5 w-5 place-items-center rounded-md border transition-all duration-150 active:scale-90",
+                selected
+                  ? "border-accent bg-accent text-accent-fg"
+                  : "border-border-strong text-transparent hover:border-accent",
+              )}
+            >
+              <Check size={13} strokeWidth={3} />
+            </span>
+          </button>
+          <Avatar name={m.from_name} email={peer} size={40} />
+        </div>
 
         {/* content */}
         <div className="min-w-0 flex-1">
