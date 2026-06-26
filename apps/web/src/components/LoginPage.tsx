@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, ApiError } from "@/api/client";
 import { Button, Spinner } from "@/components/primitives";
+import { Logomark } from "@/components/Logomark";
 
 export function LoginPage() {
   const [password, setPassword] = useState("");
@@ -35,9 +36,9 @@ export function LoginPage() {
       >
         <div className="mb-8 text-center">
           <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-accent-fg shadow-[var(--shadow-md)]">
-            <span className="font-display text-3xl leading-none">a</span>
+            <Logomark size={30} />
           </div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Aria Mail</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Driftmail</h1>
           <p className="mt-1.5 text-sm text-muted">Your private inbox, beautifully quiet.</p>
         </div>
 

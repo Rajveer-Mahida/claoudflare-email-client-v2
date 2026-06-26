@@ -1,10 +1,23 @@
+export interface EmailAttachmentOut {
+  content: ArrayBuffer | string;
+  filename: string;
+  type?: string;
+  disposition?: "attachment" | "inline";
+  contentId?: string;
+}
+
 export interface SendEmailBinding {
   send(opts: {
-    to: string;
-    from: string;
+    to: string | string[];
+    cc?: string | string[];
+    bcc?: string | string[];
+    from: string | { email: string; name?: string };
+    replyTo?: string;
     subject: string;
     html?: string;
     text?: string;
+    attachments?: EmailAttachmentOut[];
+    headers?: Record<string, string>;
   }): Promise<{ messageId: string }>;
 }
 

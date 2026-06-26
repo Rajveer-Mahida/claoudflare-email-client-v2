@@ -14,6 +14,8 @@ export type MessageRow = {
   from_addr: string;
   from_name: string | null;
   to_addr: string;
+  cc: string | null;
+  bcc: string | null;
   subject: string | null;
   snippet: string | null;
   html: string | null;
@@ -66,6 +68,7 @@ export type LabelCount = LabelRow & { count: number };
 export type CountsResponse = {
   views: ViewCounts;
   labels: LabelCount[];
+  drafts: number;
 };
 
 /** A list row is the message minus heavy body fields, plus its labels. */
@@ -86,6 +89,46 @@ export type SettingsResponse = {
   reply_enabled: boolean;
   primary_alias_domain: string;
   alias_domains: string[];
+  signature: string;
 };
 
 export type FlagField = "is_starred" | "is_archived" | "is_deleted" | "is_read";
+
+// ── Compose / drafts ─────────────────────────────────────────────────────────
+
+/** A file already uploaded to R2, ready to attach to an outgoing message. */
+export type UploadedAttachment = {
+  key: string; // R2 key under uploads/
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+};
+
+export type ComposeRequest = {
+  from?: string; // alias to send from; defaults to primary alias
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  text: string;
+  html?: string | null;
+  attachments?: UploadedAttachment[];
+  sendAfter?: number; // schedule-send timestamp (ms)
+  inReplyToMessageId?: string; // set for reply / forward threading
+  draftId?: string; // delete this draft once sent
+};
+
+export type DraftRow = {
+  id: string;
+  to_addr: string; // comma-joined
+  cc: string | null;
+  bcc: string | null;
+  subject: string | null;
+  text: string | null;
+  html: string | null;
+  in_reply_to_id: string | null;
+  attachments: string | null; // JSON UploadedAttachment[]
+  updated_at: number;
+};
+
+export type SignatureResponse = { signature: string };

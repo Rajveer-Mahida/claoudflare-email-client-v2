@@ -10,6 +10,9 @@ import { labels, counts } from "./routes/labels";
 import { settings } from "./routes/settings";
 import { reply } from "./routes/reply";
 import { attachments } from "./routes/attachments";
+import { compose } from "./routes/compose";
+import { uploads } from "./routes/uploads";
+import { drafts } from "./routes/drafts";
 
 const app = new Hono<HonoEnv>();
 
@@ -36,6 +39,9 @@ app.route("/api/labels", labels);
 app.route("/api/counts", counts);
 app.route("/api/settings", settings);
 app.route("/api/reply", reply);
+app.route("/api/send", compose);
+app.route("/api/uploads", uploads);
+app.route("/api/drafts", drafts);
 app.route("/api/attachments", attachments);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

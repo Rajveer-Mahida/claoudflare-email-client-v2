@@ -25,7 +25,7 @@
       "binding": "DB",
       "database_name": "cf-email-alies",
       "database_id": "690cfb79-5466-441c-88f4-07277934f114",
-      "migrations_dir": "../../../Email Alias Web/migrations"
+      "migrations_dir": "migrations"
     }
   ],
   "r2_buckets": [

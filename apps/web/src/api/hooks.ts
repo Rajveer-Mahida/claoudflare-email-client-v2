@@ -218,6 +218,32 @@ export function useCancelSend() {
   });
 }
 
+export function useDrafts() {
+  return useQuery({ queryKey: ["drafts"], queryFn: api.listDrafts });
+}
+
+export function useSend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.send,
+    onSettled: () => {
+      settle(qc);
+      qc.invalidateQueries({ queryKey: ["drafts"] });
+    },
+  });
+}
+
+export function useDeleteDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteDraft(id),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["drafts"] });
+      qc.invalidateQueries({ queryKey: qk.counts });
+    },
+  });
+}
+
 export function useSetSettings() {
   const qc = useQueryClient();
   return useMutation({

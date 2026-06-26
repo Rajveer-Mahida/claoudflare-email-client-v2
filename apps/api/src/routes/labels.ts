@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
-import { listLabels, createLabel, deleteLabel, getViewCounts, getLabelCounts } from "../db";
+import { listLabels, createLabel, deleteLabel, getViewCounts, getLabelCounts, draftCount } from "../db";
 
 export const labels = new Hono<HonoEnv>();
 
@@ -25,9 +25,10 @@ labels.delete("/", async (c) => {
 // GET /api/counts → sidebar view + label counts
 export const counts = new Hono<HonoEnv>();
 counts.get("/", async (c) => {
-  const [views, labelCounts] = await Promise.all([
+  const [views, labelCounts, drafts] = await Promise.all([
     getViewCounts(c.env.DB),
     getLabelCounts(c.env.DB),
+    draftCount(c.env.DB),
   ]);
-  return c.json({ views, labels: labelCounts });
+  return c.json({ views, labels: labelCounts, drafts });
 });

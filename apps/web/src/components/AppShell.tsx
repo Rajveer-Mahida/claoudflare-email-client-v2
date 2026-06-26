@@ -3,11 +3,15 @@ import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/api/client";
+import { AnimatePresence } from "framer-motion";
 import { Sidebar } from "@/components/Sidebar";
+import { Compose } from "@/components/Compose";
 import { Spinner } from "@/components/primitives";
+import { useUI } from "@/lib/store";
 
 export function AppShell() {
   const navigate = useNavigate();
+  const composeOpen = useUI((s) => s.composeOpen);
   const { isLoading, error } = useQuery({
     queryKey: ["auth", "me"],
     queryFn: api.me,
@@ -46,6 +50,7 @@ export function AppShell() {
           <Outlet />
         </div>
       </main>
+      <AnimatePresence>{composeOpen && <Compose />}</AnimatePresence>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-# Aria Mail — `email-client-v2`
+# Driftmail — `email-client-v2`
 
 A brand-new Gmail-like email client with smooth motion, built as a clean
 **frontend / worker split** that reuses the existing email data.

@@ -11,6 +11,8 @@ import {
   Star,
   Mail,
   Reply as ReplyIcon,
+  ReplyAll,
+  Forward,
   Paperclip,
   Download,
   Sun,
@@ -35,7 +37,7 @@ export function MailDetail() {
   const markRead = useMarkRead();
   const snooze = useSnooze();
   const del = useSoftDelete();
-  const { emailTheme, toggleEmailTheme } = useUI();
+  const { emailTheme, toggleEmailTheme, openCompose } = useUI();
   const [replying, setReplying] = useState(false);
 
   function back() {
@@ -78,6 +80,53 @@ export function MailDetail() {
   const { message, thread, attachments, labels } = data;
   const last = thread[thread.length - 1] ?? message;
   const replyPeer = message.direction === "out" ? message.to_addr : message.from_addr;
+
+  function quotedBody(): string {
+    const body = message.text || "";
+    return `\n\nOn ${formatFullDate(message.received_at)}, ${displayName(
+      message.from_name,
+      message.from_addr,
+    )} wrote:\n> ${body.replace(/\n/g, "\n> ")}`;
+  }
+
+  function onForward() {
+    const atts = (attachments[message.id] ?? []).map((a) => ({
+      key: a.r2_key,
+      filename: a.filename ?? "file",
+      mime_type: a.mime_type ?? "application/octet-stream",
+      size_bytes: a.size_bytes ?? 0,
+    }));
+    const subj = message.subject ?? "";
+    openCompose({
+      subject: /^fwd:/i.test(subj) ? subj : `Fwd: ${subj}`,
+      text: `\n\n---------- Forwarded message ----------\nFrom: ${message.from_addr}\nDate: ${formatFullDate(
+        message.received_at,
+      )}\nSubject: ${subj}\n\n${message.text ?? ""}`,
+      attachments: atts,
+    });
+  }
+
+  function onReplyAll() {
+    const ourAlias = (message.direction === "in" ? message.to_addr : message.from_addr).toLowerCase();
+    const cc = [message.to_addr, message.cc]
+      .filter(Boolean)
+      .join(",")
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((a) => {
+        const lo = a.toLowerCase();
+        return lo !== ourAlias && lo !== replyPeer.toLowerCase();
+      });
+    const subj = message.subject ?? "";
+    openCompose({
+      to: [replyPeer],
+      cc,
+      subject: /^re:/i.test(subj) ? subj : `Re: ${subj}`,
+      text: quotedBody(),
+      inReplyToMessageId: message.id,
+    });
+  }
 
   return (
     <motion.div
@@ -142,6 +191,17 @@ export function MailDetail() {
             }}
           >
             <Mail size={18} />
+          </IconButton>
+        </Tip>
+
+        <Tip label="Reply all">
+          <IconButton onClick={onReplyAll} aria-label="Reply all">
+            <ReplyAll size={18} />
+          </IconButton>
+        </Tip>
+        <Tip label="Forward">
+          <IconButton onClick={onForward} aria-label="Forward">
+            <Forward size={18} />
           </IconButton>
         </Tip>
 

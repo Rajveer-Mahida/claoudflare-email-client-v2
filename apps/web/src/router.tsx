@@ -10,6 +10,7 @@ import { MailDetail } from "@/components/MailDetail";
 import { EmptyDetail } from "@/components/EmptyDetail";
 import { LoginPage } from "@/components/LoginPage";
 import { SettingsPage } from "@/components/SettingsPage";
+import { DraftsPage } from "@/components/DraftsPage";
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
 
@@ -49,11 +50,18 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const draftsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/drafts",
+  component: DraftsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   shellRoute.addChildren([
     mailLayoutRoute.addChildren([indexRoute, mailRoute]),
     settingsRoute,
+    draftsRoute,
   ]),
 ]);
 

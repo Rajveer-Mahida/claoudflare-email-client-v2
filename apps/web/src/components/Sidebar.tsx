@@ -10,6 +10,8 @@ import {
   Trash2,
   Settings,
   Sparkles,
+  PenLine,
+  FileText,
   Sun,
   Moon,
   Tag,
@@ -24,6 +26,7 @@ import { useCounts, useSettings } from "@/api/hooks";
 import { api } from "@/api/client";
 import { randomAlias } from "@/lib/alias";
 import { useMediaQuery } from "@/lib/useMediaQuery";
+import { Logomark } from "@/components/Logomark";
 import { cn } from "@/lib/utils";
 import { IconButton, Tip } from "@/components/primitives";
 
@@ -58,6 +61,7 @@ export function Sidebar() {
     toggleSidebar,
     mobileNavOpen,
     setMobileNav,
+    openCompose,
   } = useUI();
   const counts = useCounts();
   const settings = useSettings();
@@ -129,9 +133,9 @@ export function Sidebar() {
               className="flex items-center gap-2.5"
             >
               <div className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-accent-fg">
-                <span className="font-display text-xl leading-none">a</span>
+                <Logomark size={18} />
               </div>
-              <span className="font-display text-lg font-semibold tracking-tight">Aria</span>
+              <span className="font-display text-lg font-semibold tracking-tight">Driftmail</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -143,16 +147,31 @@ export function Sidebar() {
         </IconButton>
       </div>
 
+      {/* Compose */}
+      <button
+        onClick={() => {
+          setMobileNav(false);
+          openCompose();
+        }}
+        className={cn(
+          "group flex items-center gap-3 rounded-[var(--radius-lg)] bg-accent px-3 py-2.5 font-medium text-accent-fg shadow-[var(--shadow-sm)] transition-all duration-150 hover:bg-accent-hover active:scale-[0.98]",
+          collapsed && "justify-center px-0",
+        )}
+      >
+        <PenLine size={18} className="transition-transform group-hover:rotate-[-8deg]" />
+        {!collapsed && <span className="text-sm">Compose</span>}
+      </button>
+
       {/* New alias */}
       <button
         onClick={genAlias}
         className={cn(
-          "group mb-1 flex items-center gap-3 rounded-[var(--radius-lg)] bg-accent px-3 py-2.5 font-medium text-accent-fg shadow-[var(--shadow-sm)] transition-all duration-150 hover:bg-accent-hover active:scale-[0.98]",
+          "group mb-1 flex items-center gap-3 rounded-[var(--radius-lg)] border border-border px-3 py-2 font-medium text-muted transition-all duration-150 hover:border-accent-ring hover:text-fg active:scale-[0.98]",
           collapsed && "justify-center px-0",
         )}
       >
-        <Sparkles size={18} className="transition-transform group-hover:rotate-12" />
-        {!collapsed && <span className="text-sm">New alias</span>}
+        <Sparkles size={17} className="transition-transform group-hover:rotate-12" />
+        {!collapsed && <span className="text-[13px]">New alias</span>}
       </button>
 
       {/* Views */}
@@ -174,6 +193,17 @@ export function Sidebar() {
             />
           );
         })}
+        <SideItem
+          active={pathname === "/drafts"}
+          collapsed={collapsed}
+          icon={<FileText size={18} />}
+          label="Drafts"
+          badge={counts.data?.drafts ?? 0}
+          onClick={() => {
+            setMobileNav(false);
+            navigate({ to: "/drafts" });
+          }}
+        />
       </nav>
 
       {/* Labels */}

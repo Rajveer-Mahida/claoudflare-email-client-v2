@@ -9,6 +9,7 @@ import type {
   ViewCounts,
   LabelCount,
   ViewName,
+  DraftRow,
 } from "@email/shared";
 
 type DB = D1Database;
@@ -363,6 +364,149 @@ export async function insertOutbound(
     )
     .run();
   return id;
+}
+
+/** Record an outbound message (new compose / forward / reply) with cc/bcc and
+ *  attachment rows. Returns the new message id. Pending if sendAfter is set. */
+export async function recordOutbound(
+  db: DB,
+  opts: {
+    from: string;
+    to: string;
+    cc?: string | null;
+    bcc?: string | null;
+    subject: string;
+    html: string | null;
+    text: string;
+    inReplyToMessageId?: string | null;
+    sendAfter?: number;
+    attachments?: { key: string; filename: string; mime_type: string; size_bytes: number }[];
+  },
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const ts = Date.now();
+  const snippet = opts.text.replace(/\s+/g, " ").trim().slice(0, 200);
+  const pending = opts.sendAfter !== undefined;
+
+  let threadId: string = id;
+  let inReplyTo: string | null = null;
+  if (opts.inReplyToMessageId) {
+    const parent = await getMessage(db, opts.inReplyToMessageId);
+    threadId = parent?.thread_id ?? parent?.message_id ?? opts.inReplyToMessageId;
+    inReplyTo = parent?.message_id ?? null;
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO messages
+         (id, in_reply_to, thread_id, direction, from_addr, from_name,
+          to_addr, cc, bcc, subject, snippet, html, text, raw_key, received_at,
+          is_read, send_state, send_after)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+    )
+    .bind(
+      id,
+      inReplyTo,
+      threadId,
+      "out",
+      opts.from,
+      null,
+      opts.to,
+      opts.cc ?? null,
+      opts.bcc ?? null,
+      opts.subject,
+      snippet,
+      opts.html,
+      opts.text,
+      "",
+      ts,
+      pending ? "pending" : null,
+      opts.sendAfter ?? null,
+    )
+    .run();
+
+  for (const a of opts.attachments ?? []) {
+    await db
+      .prepare(
+        `INSERT INTO attachments (id, message_id, filename, mime_type, r2_key, size_bytes, content_id)
+         VALUES (?,?,?,?,?,?,?)`,
+      )
+      .bind(crypto.randomUUID(), id, a.filename, a.mime_type, a.key, a.size_bytes, null)
+      .run();
+  }
+  return id;
+}
+
+// ── Drafts ───────────────────────────────────────────────────────────────────
+
+export async function listDrafts(db: DB): Promise<DraftRow[]> {
+  const res = await db.prepare(`SELECT * FROM drafts ORDER BY updated_at DESC`).all<DraftRow>();
+  return res.results ?? [];
+}
+
+export async function getDraft(db: DB, id: string): Promise<DraftRow | null> {
+  return (await db.prepare(`SELECT * FROM drafts WHERE id = ?`).bind(id).first<DraftRow>()) ?? null;
+}
+
+export async function upsertDraft(
+  db: DB,
+  d: {
+    id?: string;
+    to_addr: string;
+    cc?: string | null;
+    bcc?: string | null;
+    subject?: string | null;
+    text?: string | null;
+    html?: string | null;
+    in_reply_to_id?: string | null;
+    attachments?: string | null;
+  },
+): Promise<DraftRow> {
+  const id = d.id ?? crypto.randomUUID();
+  const updated_at = Date.now();
+  await db
+    .prepare(
+      `INSERT INTO drafts (id, to_addr, cc, bcc, subject, text, html, in_reply_to_id, attachments, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET
+         to_addr=excluded.to_addr, cc=excluded.cc, bcc=excluded.bcc, subject=excluded.subject,
+         text=excluded.text, html=excluded.html, in_reply_to_id=excluded.in_reply_to_id,
+         attachments=excluded.attachments, updated_at=excluded.updated_at`,
+    )
+    .bind(
+      id,
+      d.to_addr,
+      d.cc ?? null,
+      d.bcc ?? null,
+      d.subject ?? null,
+      d.text ?? null,
+      d.html ?? null,
+      d.in_reply_to_id ?? null,
+      d.attachments ?? null,
+      updated_at,
+    )
+    .run();
+  return {
+    id,
+    to_addr: d.to_addr,
+    cc: d.cc ?? null,
+    bcc: d.bcc ?? null,
+    subject: d.subject ?? null,
+    text: d.text ?? null,
+    html: d.html ?? null,
+    in_reply_to_id: d.in_reply_to_id ?? null,
+    attachments: d.attachments ?? null,
+    updated_at,
+  };
+}
+
+export async function deleteDraft(db: DB, id: string): Promise<void> {
+  await db.prepare(`DELETE FROM drafts WHERE id = ?`).bind(id).run();
+}
+
+export async function draftCount(db: DB): Promise<number> {
+  const r = await db.prepare(`SELECT COUNT(*) AS n FROM drafts`).first<{ n: number }>();
+  return r?.n ?? 0;
 }
 
 export async function claimPendingMessage(db: DB, id: string): Promise<boolean> {

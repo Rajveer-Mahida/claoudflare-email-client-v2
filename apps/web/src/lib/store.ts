@@ -1,5 +1,17 @@
 import { create } from "zustand";
-import type { ViewName } from "@email/shared";
+import type { ViewName, UploadedAttachment } from "@email/shared";
+
+export type ComposeInit = {
+  from?: string;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  text?: string;
+  inReplyToMessageId?: string;
+  draftId?: string;
+  attachments?: UploadedAttachment[];
+};
 
 type Theme = "light" | "dark";
 
@@ -43,6 +55,12 @@ type UIState = {
 
   mobileNavOpen: boolean;
   setMobileNav: (open: boolean) => void;
+
+  // compose panel
+  composeOpen: boolean;
+  composeInit: ComposeInit | null;
+  openCompose: (init?: ComposeInit) => void;
+  closeCompose: () => void;
 };
 
 export const useUI = create<UIState>((set, get) => ({
@@ -96,4 +114,9 @@ export const useUI = create<UIState>((set, get) => ({
 
   mobileNavOpen: false,
   setMobileNav: (open) => set({ mobileNavOpen: open }),
+
+  composeOpen: false,
+  composeInit: null,
+  openCompose: (init) => set({ composeOpen: true, composeInit: init ?? null }),
+  closeCompose: () => set({ composeOpen: false, composeInit: null }),
 }));

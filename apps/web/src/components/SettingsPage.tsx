@@ -1,10 +1,12 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import * as Switch from "@radix-ui/react-switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette } from "lucide-react";
+import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine } from "lucide-react";
 import { useSettings, useSetSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
+import { Button } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 
 export function SettingsPage() {
@@ -14,6 +16,11 @@ export function SettingsPage() {
   const { theme, toggleTheme } = useUI();
 
   const s = settings.data;
+
+  const [sig, setSig] = useState("");
+  useEffect(() => {
+    if (s?.signature !== undefined) setSig(s.signature);
+  }, [s?.signature]);
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
@@ -87,6 +94,39 @@ export function SettingsPage() {
               {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
               {theme === "dark" ? "Dark" : "Light"}
             </button>
+          </Section>
+
+          {/* Signature */}
+          <Section
+            icon={<PenLine size={18} />}
+            title="Signature"
+            desc="Appended to new messages you compose."
+            stack
+          >
+            <div className="mt-3">
+              <textarea
+                value={sig}
+                onChange={(e) => setSig(e.target.value)}
+                rows={4}
+                placeholder="Rajveer Mahida&#10;Software Engineer"
+                className="w-full resize-none rounded-[var(--radius-lg)] border border-border bg-bg px-3 py-2.5 text-sm outline-none focus:border-accent-ring"
+              />
+              <div className="mt-2 flex justify-end">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={sig === (s?.signature ?? "")}
+                  onClick={() =>
+                    save.mutate(
+                      { signature: sig },
+                      { onSuccess: () => toast.success("Signature saved") },
+                    )
+                  }
+                >
+                  Save signature
+                </Button>
+              </div>
+            </div>
           </Section>
         </div>
       </div>

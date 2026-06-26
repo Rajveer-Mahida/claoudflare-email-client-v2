@@ -6,6 +6,8 @@ import {
   getPrimaryAliasDomain,
   setPrimaryAliasDomain,
   aliasDomains,
+  getSetting,
+  setSetting,
 } from "../settings";
 
 export const settings = new Hono<HonoEnv>();
@@ -15,13 +17,19 @@ settings.get("/", async (c) => {
     reply_enabled: await getReplyEnabled(c.env.DB),
     primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env),
     alias_domains: aliasDomains(c.env),
+    signature: (await getSetting(c.env.DB, "signature")) ?? "",
   });
 });
 
 settings.post("/", async (c) => {
   const body = await c.req
-    .json<{ reply_enabled?: boolean; primary_alias_domain?: string }>()
+    .json<{ reply_enabled?: boolean; primary_alias_domain?: string; signature?: string }>()
     .catch(() => ({}) as Record<string, never>);
+
+  if (typeof body.signature === "string") {
+    await setSetting(c.env.DB, "signature", body.signature);
+    return c.json({ ok: true });
+  }
 
   if (typeof body.primary_alias_domain === "string") {
     try {

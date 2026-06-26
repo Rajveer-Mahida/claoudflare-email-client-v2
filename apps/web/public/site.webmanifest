@@ -1,0 +1,15 @@
+{
+  "name": "Driftmail",
+  "short_name": "Driftmail",
+  "description": "Your private inbox, beautifully quiet.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#b4632a",
+  "background_color": "#f4f1ea",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

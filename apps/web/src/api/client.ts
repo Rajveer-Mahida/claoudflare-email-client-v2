@@ -6,6 +6,9 @@ import type {
   SettingsResponse,
   ViewName,
   FlagField,
+  ComposeRequest,
+  DraftRow,
+  UploadedAttachment,
 } from "@email/shared";
 
 export class ApiError extends Error {
@@ -94,6 +97,31 @@ export const api = {
     sendAfter?: number;
   }) => req<{ ok: true; id: string; pending?: boolean }>("/api/reply", body(data)),
 
-  setSettings: (data: { reply_enabled?: boolean; primary_alias_domain?: string }) =>
+  setSettings: (data: { reply_enabled?: boolean; primary_alias_domain?: string; signature?: string }) =>
     req<{ ok: true }>("/api/settings", body(data)),
+
+  // compose / drafts / uploads
+  send: (data: ComposeRequest) =>
+    req<{ ok: true; id: string; pending?: boolean }>("/api/send", body(data)),
+  listDrafts: () => req<DraftRow[]>("/api/drafts"),
+  getDraft: (id: string) => req<DraftRow>(`/api/drafts/${id}`),
+  saveDraft: (data: Partial<DraftRow> & { to_addr: string }) =>
+    req<DraftRow>("/api/drafts", body(data)),
+  deleteDraft: (id: string) =>
+    req<{ ok: true }>(`/api/drafts/${id}`, { method: "DELETE" }),
+  uploadFile: async (file: File): Promise<UploadedAttachment> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/uploads", { method: "POST", body: fd, credentials: "include" });
+    if (!res.ok) {
+      let msg = res.statusText;
+      try {
+        msg = ((await res.json()) as { error?: string }).error ?? msg;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(res.status, msg);
+    }
+    return (await res.json()) as UploadedAttachment;
+  },
 };
