@@ -12,7 +12,7 @@ import { attachments } from "./routes/attachments";
 const app = new Hono<HonoEnv>();
 
 // Auth gate: everything under /api except the login endpoint requires a valid session.
-const PUBLIC_PATHS = new Set(["/api/auth/login"]);
+const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/health"]);
 
 app.use("/api/*", async (c, next) => {
   if (PUBLIC_PATHS.has(c.req.path)) return next();
