@@ -53,8 +53,8 @@ export function ReplyComposer({
       const timer = setTimeout(async () => {
         try {
           await api.sendNow(res.id);
-        } catch {
-          /* cron may have already claimed it */
+        } catch (err) {
+          toast.error(err instanceof ApiError ? `Send failed: ${err.message}` : "Send failed");
         }
         qc.invalidateQueries({ queryKey: ["messages"] });
         qc.invalidateQueries({ queryKey: ["message"] });

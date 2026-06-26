@@ -178,6 +178,8 @@ messages.post("/send-now", async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.error("send-now failed", err);
+    // Revert the claim so the row isn't stuck in 'sending' forever.
+    await c.env.DB.prepare(`UPDATE messages SET send_state='pending' WHERE id = ?`).bind(id).run();
     return c.json({ error: (err as Error)?.message ?? "send failed" }, 500);
   }
 });
