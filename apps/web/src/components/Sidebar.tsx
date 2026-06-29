@@ -158,7 +158,7 @@ export function Sidebar() {
         disabled={!(settings.data?.compose_enabled ?? true)}
         title={settings.data?.compose_enabled === false ? "Compose is disabled in Settings" : undefined}
         className={cn(
-          "group flex items-center gap-3 rounded-[var(--radius-lg)] bg-accent px-3 py-2.5 font-medium text-accent-fg shadow-[var(--shadow-sm)] transition-all duration-150 hover:bg-accent-hover active:scale-[0.98]",
+          "group mb-2 flex items-center gap-3 rounded-[var(--radius-lg)] bg-accent px-3 py-2.5 font-medium text-accent-fg shadow-[var(--shadow-sm)] transition-all duration-150 hover:bg-accent-hover active:scale-[0.98]",
           "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-accent disabled:active:scale-100",
           collapsed && "justify-center px-0",
         )}
