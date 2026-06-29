@@ -76,6 +76,141 @@
    No attribute (or data-accent="amber") = the burnt-amber default above.
    Each preset overrides the 5 accent vars for light; `.dark[...]` for dark.
    ───────────────────────────────────────────────────────────────────────── */
+[data-accent="red"] {
+  --accent: #dc2626;
+  --accent-hover: #b91c1c;
+  --accent-fg: #ffffff;
+  --accent-soft: #fbd6d6;
+  --accent-ring: #f87171;
+  --bg: #f5efef;
+  --surface: #fcf9f9;
+  --elevated: #ffffff;
+  --inset: #f1e9e9;
+  --border: #ece1e1;
+  --border-strong: #ddcccc;
+}
+.dark[data-accent="red"] {
+  --accent: #f87171;
+  --accent-hover: #fca5a5;
+  --accent-fg: #1f0a0a;
+  --accent-soft: #2e1717;
+  --accent-ring: #dc2626;
+  --bg: #151010;
+  --surface: #1c1515;
+  --elevated: #221a1a;
+  --inset: #120e0e;
+  --border: #2e2424;
+  --border-strong: #3a2e2e;
+}
+
+[data-accent="indigo"] {
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-fg: #ffffff;
+  --accent-soft: #e0ddfb;
+  --accent-ring: #818cf8;
+  --bg: #eeeef6;
+  --surface: #f8f8fc;
+  --elevated: #ffffff;
+  --inset: #e8e8f2;
+  --border: #ddddec;
+  --border-strong: #c9c9de;
+}
+.dark[data-accent="indigo"] {
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-fg: #0e0b1f;
+  --accent-soft: #1a1933;
+  --accent-ring: #4f46e5;
+  --bg: #100f17;
+  --surface: #16151d;
+  --elevated: #1c1b26;
+  --inset: #0d0c12;
+  --border: #272533;
+  --border-strong: #353145;
+}
+
+[data-accent="cyan"] {
+  --accent: #0e7490;
+  --accent-hover: #155e75;
+  --accent-fg: #ffffff;
+  --accent-soft: #c3ecf3;
+  --accent-ring: #22d3ee;
+  --bg: #ecf3f5;
+  --surface: #f6fbfc;
+  --elevated: #ffffff;
+  --inset: #e5eef0;
+  --border: #d9e7ea;
+  --border-strong: #c4d6da;
+}
+.dark[data-accent="cyan"] {
+  --accent: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-fg: #04141a;
+  --accent-soft: #0a2228;
+  --accent-ring: #0e7490;
+  --bg: #0e1316;
+  --surface: #141a1d;
+  --elevated: #1a2125;
+  --inset: #0b1012;
+  --border: #242d31;
+  --border-strong: #313c41;
+}
+
+[data-accent="lime"] {
+  --accent: #4d7c0f;
+  --accent-hover: #3f6212;
+  --accent-fg: #ffffff;
+  --accent-soft: #dcecc3;
+  --accent-ring: #84cc16;
+  --bg: #f0f3e9;
+  --surface: #f9fbf4;
+  --elevated: #ffffff;
+  --inset: #eaefe0;
+  --border: #e0e8d2;
+  --border-strong: #ccd6b9;
+}
+.dark[data-accent="lime"] {
+  --accent: #84cc16;
+  --accent-hover: #a3e635;
+  --accent-fg: #0e1404;
+  --accent-soft: #1a240b;
+  --accent-ring: #4d7c0f;
+  --bg: #11130c;
+  --surface: #171a11;
+  --elevated: #1d2117;
+  --inset: #0e100a;
+  --border: #282d20;
+  --border-strong: #353c2c;
+}
+
+[data-accent="slate"] {
+  --accent: #475569;
+  --accent-hover: #334155;
+  --accent-fg: #ffffff;
+  --accent-soft: #dde3ea;
+  --accent-ring: #94a3b8;
+  --bg: #eef0f2;
+  --surface: #f8f9fb;
+  --elevated: #ffffff;
+  --inset: #e8eaee;
+  --border: #dde1e7;
+  --border-strong: #c9cfd8;
+}
+.dark[data-accent="slate"] {
+  --accent: #94a3b8;
+  --accent-hover: #cbd5e1;
+  --accent-fg: #0c1119;
+  --accent-soft: #1a2030;
+  --accent-ring: #475569;
+  --bg: #0f1115;
+  --surface: #15171d;
+  --elevated: #1b1e25;
+  --inset: #0c0e12;
+  --border: #262a33;
+  --border-strong: #333845;
+}
+
 [data-accent="blue"] {
   --accent: #1d4ed8;
   --accent-hover: #1e40af;
@@ -407,6 +542,22 @@
       transparent
     );
     animation: shimmer 1.6s infinite;
+  }
+}
+
+/* Crossfade colors during a theme/accent switch (class toggled briefly by the
+   store). Scoped to no-preference so reduced-motion users get an instant flip. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-anim,
+  .theme-anim *,
+  .theme-anim *::before,
+  .theme-anim *::after {
+    transition:
+      background-color 0.38s ease,
+      border-color 0.38s ease,
+      color 0.28s ease,
+      fill 0.34s ease,
+      box-shadow 0.38s ease !important;
   }
 }
 

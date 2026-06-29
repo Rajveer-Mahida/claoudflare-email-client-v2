@@ -11,14 +11,19 @@ import { RulesManager } from "@/components/RulesManager";
 import { pushSupported, pushEnabled, enablePush, disablePush } from "@/lib/push";
 import { cn } from "@/lib/utils";
 
-const ACCENTS: { name: string; label: string; color: string }[] = [
-  { name: "amber", label: "Amber", color: "#b4632a" },
-  { name: "orange", label: "Orange", color: "#c2410c" },
-  { name: "pink", label: "Pink", color: "#db2777" },
-  { name: "blue", label: "Blue", color: "#1d4ed8" },
-  { name: "teal", label: "Teal", color: "#0f766e" },
-  { name: "emerald", label: "Emerald", color: "#047857" },
-  { name: "violet", label: "Violet", color: "#6d28d9" },
+const ACCENTS: { name: string; label: string }[] = [
+  { name: "amber", label: "Amber" },
+  { name: "orange", label: "Orange" },
+  { name: "red", label: "Red" },
+  { name: "pink", label: "Pink" },
+  { name: "violet", label: "Violet" },
+  { name: "indigo", label: "Indigo" },
+  { name: "blue", label: "Blue" },
+  { name: "cyan", label: "Cyan" },
+  { name: "teal", label: "Teal" },
+  { name: "emerald", label: "Emerald" },
+  { name: "lime", label: "Lime" },
+  { name: "slate", label: "Slate" },
 ];
 
 export function SettingsPage() {
@@ -151,24 +156,42 @@ export function SettingsPage() {
             desc="Pick the highlight color used across the app."
             stack
           >
-            <div className="mt-3 flex flex-wrap gap-2.5">
+            <div className="mt-3 grid grid-cols-3 gap-2.5 sm:grid-cols-4">
               {ACCENTS.map((a) => {
                 const active = accent === a.name;
                 return (
                   <button
                     key={a.name}
+                    data-accent={a.name}
                     onClick={() => setAccent(a.name)}
                     aria-label={a.label}
                     title={a.label}
                     className={cn(
-                      "grid h-9 w-9 place-items-center rounded-full text-white transition-transform hover:scale-110",
+                      // local theme scope: data-accent gives this tile the preset's
+                      // vars; the `dark` class pulls its dark values when in dark mode.
+                      theme === "dark" && "dark",
+                      "group rounded-xl border bg-bg p-2 text-left transition",
                       active
-                        ? "ring-2 ring-offset-2 ring-offset-elevated"
-                        : "ring-1 ring-black/10",
+                        ? "border-accent ring-2 ring-accent"
+                        : "border-border hover:border-accent-ring",
                     )}
-                    style={{ background: a.color, ...(active ? { ["--tw-ring-color" as string]: a.color } : {}) }}
                   >
-                    {active && <Check size={16} strokeWidth={3} />}
+                    {/* mini app preview */}
+                    <div className="rounded-lg border border-border bg-surface p-2">
+                      <div className="mb-1.5 h-2 w-7 rounded-full bg-accent" />
+                      <div className="space-y-1">
+                        <div className="h-1.5 w-full rounded bg-inset" />
+                        <div className="h-1.5 w-2/3 rounded bg-inset" />
+                      </div>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-1 px-0.5">
+                      {active ? (
+                        <Check size={13} strokeWidth={3} className="text-accent" />
+                      ) : (
+                        <span className="h-2 w-2 rounded-full bg-accent" />
+                      )}
+                      <span className="text-xs font-medium text-fg">{a.label}</span>
+                    </div>
                   </button>
                 );
               })}

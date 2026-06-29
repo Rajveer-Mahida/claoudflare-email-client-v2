@@ -38,6 +38,16 @@ function initialAccent(): string {
   }
 }
 
+// Briefly enable a global color transition so theme/accent switches crossfade
+// instead of snapping. Auto-removed so it never lags hover states.
+let themeAnimTimer: ReturnType<typeof setTimeout> | undefined;
+function flashThemeAnim() {
+  const el = document.documentElement;
+  el.classList.add("theme-anim");
+  clearTimeout(themeAnimTimer);
+  themeAnimTimer = setTimeout(() => el.classList.remove("theme-anim"), 420);
+}
+
 type UIState = {
   theme: Theme;
   toggleTheme: () => void;
@@ -87,6 +97,7 @@ export const useUI = create<UIState>((set, get) => ({
   theme: initialTheme(),
   toggleTheme: () => {
     const next: Theme = get().theme === "dark" ? "light" : "dark";
+    flashThemeAnim();
     document.documentElement.classList.toggle("dark", next === "dark");
     try {
       localStorage.setItem("aria-theme", next);
@@ -109,6 +120,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   accent: initialAccent(),
   setAccent: (name) => {
+    flashThemeAnim();
     try {
       localStorage.setItem("aria-accent", name);
     } catch {
