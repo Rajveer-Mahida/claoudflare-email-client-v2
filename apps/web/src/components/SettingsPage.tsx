@@ -13,12 +13,8 @@ import { cn } from "@/lib/utils";
 
 const ACCENTS: { name: string; label: string; color: string }[] = [
   { name: "amber", label: "Amber", color: "#b4632a" },
-  { name: "blue", label: "Blue", color: "#1d4ed8" },
-  { name: "emerald", label: "Emerald", color: "#047857" },
-  { name: "violet", label: "Violet", color: "#6d28d9" },
-  { name: "rose", label: "Rose", color: "#be123c" },
-  { name: "teal", label: "Teal", color: "#0f766e" },
   { name: "orange", label: "Orange", color: "#c2410c" },
+  { name: "pink", label: "Pink", color: "#db5b86" },
 ];
 
 export function SettingsPage() {

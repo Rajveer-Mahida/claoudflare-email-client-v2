@@ -76,79 +76,19 @@
    No attribute (or data-accent="amber") = the burnt-amber default above.
    Each preset overrides the 5 accent vars for light; `.dark[...]` for dark.
    ───────────────────────────────────────────────────────────────────────── */
-[data-accent="blue"] {
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
+[data-accent="pink"] {
+  --accent: #db5b86;
+  --accent-hover: #c94d78;
   --accent-fg: #ffffff;
-  --accent-soft: #dbe4fb;
-  --accent-ring: #3b82f6;
+  --accent-soft: #fbe3ed;
+  --accent-ring: #efa0bf;
 }
-.dark[data-accent="blue"] {
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-fg: #0b1220;
-  --accent-soft: #16213b;
-  --accent-ring: #1d4ed8;
-}
-
-[data-accent="emerald"] {
-  --accent: #047857;
-  --accent-hover: #065f46;
-  --accent-fg: #ffffff;
-  --accent-soft: #c7f0dd;
-  --accent-ring: #10b981;
-}
-.dark[data-accent="emerald"] {
-  --accent: #10b981;
-  --accent-hover: #34d399;
-  --accent-fg: #04140d;
-  --accent-soft: #0c241b;
-  --accent-ring: #047857;
-}
-
-[data-accent="violet"] {
-  --accent: #6d28d9;
-  --accent-hover: #5b21b6;
-  --accent-fg: #ffffff;
-  --accent-soft: #e6ddfb;
-  --accent-ring: #8b5cf6;
-}
-.dark[data-accent="violet"] {
-  --accent: #8b5cf6;
-  --accent-hover: #a78bfa;
-  --accent-fg: #14091f;
-  --accent-soft: #1f1733;
-  --accent-ring: #6d28d9;
-}
-
-[data-accent="rose"] {
-  --accent: #be123c;
-  --accent-hover: #9f1239;
-  --accent-fg: #ffffff;
-  --accent-soft: #fbd7de;
-  --accent-ring: #f43f5e;
-}
-.dark[data-accent="rose"] {
-  --accent: #f43f5e;
-  --accent-hover: #fb7185;
-  --accent-fg: #1f0a0f;
-  --accent-soft: #2e151b;
-  --accent-ring: #be123c;
-}
-
-[data-accent="teal"] {
-  --accent: #0f766e;
-  --accent-hover: #115e59;
-  --accent-fg: #ffffff;
-  --accent-soft: #c2f0ea;
-  --accent-ring: #14b8a6;
-}
-.dark[data-accent="teal"] {
-  --accent: #14b8a6;
-  --accent-hover: #2dd4bf;
-  --accent-fg: #04140f;
-  --accent-soft: #0a2420;
-  --accent-ring: #0f766e;
+.dark[data-accent="pink"] {
+  --accent: #ed9cbd;
+  --accent-hover: #f3b9d2;
+  --accent-fg: #2a0f1c;
+  --accent-soft: #2d1923;
+  --accent-ring: #c94d78;
 }
 
 [data-accent="orange"] {
