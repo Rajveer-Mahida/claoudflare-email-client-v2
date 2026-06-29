@@ -170,12 +170,12 @@ export function Sidebar() {
       <button
         onClick={genAlias}
         className={cn(
-          "group mb-1 flex items-center gap-3 rounded-[var(--radius-lg)] border border-border px-3 py-2 font-medium text-muted transition-all duration-150 hover:border-accent-ring hover:text-fg active:scale-[0.98]",
+          "group mb-1 flex h-10 items-center gap-3 rounded-[var(--radius-lg)] px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-inset hover:text-fg",
           collapsed && "justify-center px-0",
         )}
       >
-        <Sparkles size={17} className="transition-transform group-hover:rotate-12" />
-        {!collapsed && <span className="text-[13px]">New alias</span>}
+        <Sparkles size={18} className="transition-transform group-hover:rotate-12" />
+        {!collapsed && <span>New alias</span>}
       </button>
 
       {/* Scrollable nav (views + labels) */}
