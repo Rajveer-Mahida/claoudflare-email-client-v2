@@ -257,28 +257,42 @@ export function Sidebar() {
             navigate({ to: "/settings" });
           }}
         />
-        <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "justify-between px-1")}>
-          <Tip label={theme === "dark" ? "Light mode" : "Dark mode"}>
-            <IconButton onClick={toggleTheme} aria-label="Toggle theme">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={theme}
-                  initial={{ opacity: 0, rotate: -45, scale: 0.6 }}
-                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                  exit={{ opacity: 0, rotate: 45, scale: 0.6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-                </motion.span>
-              </AnimatePresence>
-            </IconButton>
-          </Tip>
-          <Tip label="Sign out">
-            <IconButton onClick={logout} aria-label="Sign out">
-              <LogOut size={18} />
-            </IconButton>
-          </Tip>
-        </div>
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle theme"
+          className={cn(
+            "group flex h-10 items-center gap-3 rounded-[var(--radius-lg)] px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-inset hover:text-fg",
+            collapsed && "justify-center px-0",
+          )}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, rotate: -45, scale: 0.6 }}
+              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+              exit={{ opacity: 0, rotate: 45, scale: 0.6 }}
+              transition={{ duration: 0.18 }}
+              className="shrink-0"
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </motion.span>
+          </AnimatePresence>
+          {!collapsed && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
+        </button>
+
+        {/* Sign out */}
+        <button
+          onClick={logout}
+          aria-label="Sign out"
+          className={cn(
+            "group flex h-10 items-center gap-3 rounded-[var(--radius-lg)] px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-danger/10 hover:text-danger",
+            collapsed && "justify-center px-0",
+          )}
+        >
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
       </div>
       </aside>
     </>
