@@ -166,16 +166,16 @@ export function Sidebar() {
         </button>
       )}
 
-      {/* New alias */}
+      {/* New alias — secondary action, distinct from nav items */}
       <button
         onClick={genAlias}
         className={cn(
-          "group mb-1 flex h-10 items-center gap-3 rounded-[var(--radius-lg)] px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-inset hover:text-fg",
+          "group mb-2 flex items-center gap-3 rounded-[var(--radius-lg)] border border-accent-ring/40 bg-accent-soft/40 px-3 py-2.5 text-sm font-medium text-fg transition-all duration-150 hover:border-accent-ring hover:bg-accent-soft active:scale-[0.98]",
           collapsed && "justify-center px-0",
         )}
       >
-        <Sparkles size={18} className="transition-transform group-hover:rotate-12" />
-        {!collapsed && <span>New alias</span>}
+        <Sparkles size={18} className="text-accent transition-transform group-hover:rotate-12" />
+        {!collapsed && <span>Generate New alias</span>}
       </button>
 
       {/* Scrollable nav (views + labels) */}
