@@ -169,6 +169,7 @@ export function AliasesPage() {
                   key={a.address}
                   a={a}
                   selected={selected.has(a.address)}
+                  selectMode={selected.size > 0}
                   onToggle={() => toggleSel(a.address)}
                   onView={() => {
                     setAliasFilter(a.address);
@@ -188,11 +189,13 @@ function AliasCard({
   a,
   onView,
   selected,
+  selectMode,
   onToggle,
 }: {
   a: AliasWithCount;
   onView: () => void;
   selected: boolean;
+  selectMode: boolean;
   onToggle: () => void;
 }) {
   const update = useUpdateAlias();
@@ -214,34 +217,50 @@ function AliasCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
+      onClick={() => selectMode && onToggle()}
       className={cn(
-        "rounded-2xl border bg-elevated p-4 transition",
+        "group rounded-2xl border bg-elevated p-4 transition",
         selected ? "border-accent ring-1 ring-accent" : "border-border",
+        selectMode && "cursor-pointer",
         a.disabled && "opacity-60",
       )}
     >
       <div className="flex items-start gap-3">
+        {/* checkbox slides in on hover or while selecting (mirrors inbox) */}
         <button
-          onClick={onToggle}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
           aria-label={selected ? "Deselect alias" : "Select alias"}
           className={cn(
-            "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition",
-            selected
-              ? "border-accent bg-accent text-accent-fg"
-              : "border-border-strong hover:border-accent-ring",
+            "mt-0.5 grid place-items-center overflow-hidden transition-[width,margin,opacity] duration-200 ease-out",
+            selected || selectMode
+              ? "w-5 opacity-100"
+              : "w-0 opacity-0 group-hover:w-5 group-hover:opacity-100",
           )}
         >
-          {selected && <Check size={13} strokeWidth={3} />}
+          <span
+            className={cn(
+              "grid h-5 w-5 place-items-center rounded-md border transition-all duration-150 active:scale-90",
+              selected
+                ? "border-accent bg-accent text-accent-fg"
+                : "border-border-strong text-transparent hover:border-accent",
+            )}
+          >
+            <Check size={13} strokeWidth={3} />
+          </span>
         </button>
         <div className="min-w-0 flex-1">
           <input
             value={name}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => name !== (a.name ?? "") && update.mutate({ address: a.address, name: name || null })}
             placeholder="Add a label"
             className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-faint"
           />
-          <button onClick={copy} className="group mt-0.5 flex items-center gap-1.5 font-mono text-[12.5px] text-muted hover:text-fg">
+          <button onClick={(e) => { e.stopPropagation(); copy(); }} className="mt-0.5 flex items-center gap-1.5 font-mono text-[12.5px] text-muted hover:text-fg [&:hover_svg]:opacity-100">
             <span className="truncate">{a.address}</span>
             <Copy size={12} className="shrink-0 opacity-0 transition group-hover:opacity-100" />
           </button>
@@ -254,7 +273,7 @@ function AliasCard({
       </div>
 
       <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
+        <label onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-muted">
           <Switch.Root
             checked={a.disabled === 0}
             onCheckedChange={(v) =>
@@ -269,11 +288,12 @@ function AliasCard({
           </Switch.Root>
           {a.disabled ? "Disabled" : "Active"}
         </label>
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={onView}>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={(e) => { e.stopPropagation(); onView(); }}>
           <Inbox size={15} /> View inbox
         </Button>
         <IconButton
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             del.mutate(a.address);
             toast.success("Alias removed");
           }}
