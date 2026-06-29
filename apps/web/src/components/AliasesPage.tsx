@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import * as Switch from "@radix-ui/react-switch";
 import { toast } from "sonner";
-import { ArrowLeft, AtSign, Copy, Inbox, Trash2, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, AtSign, Copy, Inbox, Trash2, Sparkles, Plus, Check, Ban } from "lucide-react";
 import type { AliasWithCount } from "@email/shared";
 import { useAliases, useCreateAlias, useUpdateAlias, useDeleteAlias, useSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
@@ -15,8 +15,36 @@ export function AliasesPage() {
   const navigate = useNavigate();
   const aliases = useAliases();
   const create = useCreateAlias();
+  const del = useDeleteAlias();
+  const update = useUpdateAlias();
   const settings = useSettings();
   const { setAliasFilter } = useUI();
+
+  const list = aliases.data ?? [];
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const allSelected = list.length > 0 && selected.size === list.length;
+  function toggleSel(addr: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(addr) ? n.delete(addr) : n.add(addr);
+      return n;
+    });
+  }
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(list.map((a) => a.address)));
+  }
+  async function bulkDelete() {
+    const addrs = [...selected];
+    setSelected(new Set());
+    await Promise.all(addrs.map((a) => del.mutateAsync(a).catch(() => {})));
+    toast.success(`${addrs.length} alias${addrs.length > 1 ? "es" : ""} removed`);
+  }
+  async function bulkDisable() {
+    const addrs = [...selected];
+    setSelected(new Set());
+    await Promise.all(addrs.map((a) => update.mutateAsync({ address: a, disabled: 1 }).catch(() => {})));
+    toast.success(`${addrs.length} alias${addrs.length > 1 ? "es" : ""} disabled`);
+  }
 
   const domains = settings.data?.alias_domains ?? [];
   const [name, setName] = useState("");
@@ -92,6 +120,33 @@ export function AliasesPage() {
           </div>
         </div>
 
+        {/* Bulk action bar */}
+        <AnimatePresence>
+          {selected.size > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -8, height: 0 }}
+              className="sticky top-0 z-10 mb-3 overflow-hidden"
+            >
+              <div className="flex items-center gap-2 rounded-2xl border border-accent-ring/40 bg-accent-soft/70 px-3 py-2 backdrop-blur">
+                <span className="text-sm font-medium">{selected.size} selected</span>
+                <button onClick={toggleAll} className="text-xs text-muted hover:text-fg">
+                  {allSelected ? "Clear" : "Select all"}
+                </button>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={bulkDisable}>
+                    <Ban size={15} /> Disable
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={bulkDelete}>
+                    <Trash2 size={15} /> Delete
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* List */}
         {aliases.isLoading ? (
           <div className="grid place-items-center py-12">
@@ -109,10 +164,12 @@ export function AliasesPage() {
         ) : (
           <div className="space-y-2">
             <AnimatePresence initial={false}>
-              {aliases.data!.map((a) => (
+              {list.map((a) => (
                 <AliasCard
                   key={a.address}
                   a={a}
+                  selected={selected.has(a.address)}
+                  onToggle={() => toggleSel(a.address)}
                   onView={() => {
                     setAliasFilter(a.address);
                     navigate({ to: "/" });
@@ -127,7 +184,17 @@ export function AliasesPage() {
   );
 }
 
-function AliasCard({ a, onView }: { a: AliasWithCount; onView: () => void }) {
+function AliasCard({
+  a,
+  onView,
+  selected,
+  onToggle,
+}: {
+  a: AliasWithCount;
+  onView: () => void;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   const update = useUpdateAlias();
   const del = useDeleteAlias();
   const [name, setName] = useState(a.name ?? "");
@@ -148,11 +215,24 @@ function AliasCard({ a, onView }: { a: AliasWithCount; onView: () => void }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0 }}
       className={cn(
-        "rounded-2xl border border-border bg-elevated p-4 transition",
+        "rounded-2xl border bg-elevated p-4 transition",
+        selected ? "border-accent ring-1 ring-accent" : "border-border",
         a.disabled && "opacity-60",
       )}
     >
       <div className="flex items-start gap-3">
+        <button
+          onClick={onToggle}
+          aria-label={selected ? "Deselect alias" : "Select alias"}
+          className={cn(
+            "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition",
+            selected
+              ? "border-accent bg-accent text-accent-fg"
+              : "border-border-strong hover:border-accent-ring",
+          )}
+        >
+          {selected && <Check size={13} strokeWidth={3} />}
+        </button>
         <div className="min-w-0 flex-1">
           <input
             value={name}
