@@ -56,20 +56,22 @@ Single Cloudflare Worker `smi-mail`: SPA (Vite/React 19) + Hono JSON API + inbou
 - [x] Subscribe/unsubscribe API + `push_subscriptions` table
 - [x] Settings "New-mail notifications" enable/disable
 
-## ⏳ Remaining
+### Phase 8 — AI summarize + smart reply
+- [x] `POST /api/ai/summarize` (thread → 2–4 sentence summary) via Claude Messages API (`claude-haiku-4-5`, raw fetch)
+- [x] `POST /api/ai/smart-reply` (thread → 3 reply drafts, structured output)
+- [x] Summarize button + summary card + "Suggest" chips in `MailDetail` (chips prefill the composer)
+- [x] Graceful 503 when `ANTHROPIC_API_KEY` unset → "AI not set up yet" toast
+- Model overridable via `AI_MODEL` var
 
-### Phase 8 — AI (summarize + smart reply)  ← next
-- [ ] `POST /api/ai/summarize` (thread → summary) via Claude API
-- [ ] `POST /api/ai/smart-reply` (thread → reply drafts → prefill composer)
-- [ ] Summarize button + smart-reply chips in `MailDetail`
-- [ ] (optional) phishing/spam flag on ingest
-- **Needs**: `ANTHROPIC_API_KEY` secret
+## 🎉 All 8 phases complete
 
-## ⚠️ Operator action required
+## ⚠️ Operator actions required (need your Cloudflare account)
 - **Email Sending onboarding** — sending (compose/reply/forward) fails with "destination not verified" until the domains are onboarded:
   - `npx wrangler email sending enable rajveer.space`
   - `npx wrangler email sending enable 100xdev.qzz.io`
   - Receiving, aliases, rules, search, push all work without this.
+- **AI key** — Summarize / Suggest replies return "AI not set up yet" until set:
+  - `cd apps/api && npx wrangler secret put ANTHROPIC_API_KEY`
 
 ## Migrations applied (D1 `cf-email-alies`)
 `0004_compose` (cc/bcc + drafts) · `0005_aliases` · `0006_rules` · `0007_push`
