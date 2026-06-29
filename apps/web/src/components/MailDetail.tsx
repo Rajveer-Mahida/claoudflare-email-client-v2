@@ -300,7 +300,7 @@ export function MailDetail() {
 
       {/* scroll body */}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
-        <div className="w-full px-3 py-6 md:px-6">
+        <div className="w-full px-3 pt-3 pb-6 md:px-6 md:pt-6">
           <AnimatePresence>
             {summary && (
               <motion.div
@@ -338,7 +338,7 @@ export function MailDetail() {
               </span>
             ))}
           </div>
-          <h1 className="mb-5 font-display text-[1.35rem] font-semibold leading-tight tracking-tight text-balance md:text-[1.7rem]">
+          <h1 className="mb-5 font-display text-[1.1rem] font-semibold leading-tight tracking-tight text-balance md:text-[1.7rem]">
             {message.subject || "(no subject)"}
           </h1>
 
