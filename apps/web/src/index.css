@@ -77,18 +77,18 @@
    Each preset overrides the 5 accent vars for light; `.dark[...]` for dark.
    ───────────────────────────────────────────────────────────────────────── */
 [data-accent="pink"] {
-  --accent: #db5b86;
-  --accent-hover: #c94d78;
+  --accent: #db2777;
+  --accent-hover: #be185d;
   --accent-fg: #ffffff;
-  --accent-soft: #fbe3ed;
-  --accent-ring: #efa0bf;
+  --accent-soft: #fbd9e8;
+  --accent-ring: #f472b6;
 }
 .dark[data-accent="pink"] {
-  --accent: #ed9cbd;
-  --accent-hover: #f3b9d2;
+  --accent: #f472b6;
+  --accent-hover: #f9a8d4;
   --accent-fg: #2a0f1c;
-  --accent-soft: #2d1923;
-  --accent-ring: #c94d78;
+  --accent-soft: #2e1822;
+  --accent-ring: #db2777;
 }
 
 [data-accent="orange"] {
