@@ -8,10 +8,10 @@
   "observability": { "enabled": true },
   "upload_source_maps": true,
 
-  // Single worker serves everything on mail.rajveer.space:
+  // Single worker serves everything on driftmail.rajveer.space:
   //   /api/*  → this Hono worker (run_worker_first)
   //   /*      → the built SPA static assets, with SPA fallback for client routes
-  "routes": [{ "pattern": "mail.rajveer.space", "custom_domain": true }],
+  "routes": [{ "pattern": "driftmail.rajveer.space", "custom_domain": true }],
   "assets": {
     "directory": "../web/dist",
     "binding": "ASSETS",
