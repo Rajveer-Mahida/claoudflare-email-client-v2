@@ -117,6 +117,14 @@
     color: var(--fg);
   }
 
+  /* Tailwind v4 defaults buttons to cursor:default — restore pointer. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label:has(> input[type="checkbox"]),
+  summary {
+    cursor: pointer;
+  }
+
   /* Warm grain + subtle radial glow on the app backdrop */
   .app-backdrop {
     background-color: var(--bg);
