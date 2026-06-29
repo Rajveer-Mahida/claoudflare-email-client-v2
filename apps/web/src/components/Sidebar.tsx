@@ -149,8 +149,9 @@ export function Sidebar() {
         </IconButton>
       </div>
 
-      {/* Compose */}
-      {(settings.data?.compose_enabled ?? true) && (
+      {/* Compose — only once settings load, so a disabled inbox never flashes
+          the button on reload (default-true would otherwise show then hide). */}
+      {settings.isSuccess && settings.data.compose_enabled && (
         <button
           onClick={() => {
             setMobileNav(false);
