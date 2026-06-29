@@ -21,18 +21,6 @@ import { ai } from "./routes/ai";
 
 const app = new Hono<HonoEnv>();
 
-// Canonical host: bounce the bare *.workers.dev URL to the Access-gated custom
-// domain (runs before auth, so nothing leaks). Old links/bookmarks still work.
-app.use("*", async (c, next) => {
-  const url = new URL(c.req.url);
-  if (url.hostname.endsWith(".workers.dev")) {
-    url.hostname = "mail.rajveer.space";
-    url.port = "";
-    return c.redirect(url.toString(), 301);
-  }
-  return next();
-});
-
 // Auth gate: everything under /api except the login endpoint requires a valid session.
 const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/health"]);
 
