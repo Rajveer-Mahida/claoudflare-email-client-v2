@@ -30,6 +30,14 @@ function initialEmailTheme(): Theme {
   }
 }
 
+function initialAccent(): string {
+  try {
+    return localStorage.getItem("aria-accent") || "amber";
+  } catch {
+    return "amber";
+  }
+}
+
 type UIState = {
   theme: Theme;
   toggleTheme: () => void;
@@ -37,6 +45,10 @@ type UIState = {
   // reading-pane-only theme for email content (separate from app theme)
   emailTheme: Theme;
   toggleEmailTheme: () => void;
+
+  // user-selectable accent color preset (client-only)
+  accent: string;
+  setAccent: (name: string) => void;
 
   // current list filter
   view: ViewName;
@@ -93,6 +105,21 @@ export const useUI = create<UIState>((set, get) => ({
       /* ignore */
     }
     set({ emailTheme: next });
+  },
+
+  accent: initialAccent(),
+  setAccent: (name) => {
+    try {
+      localStorage.setItem("aria-accent", name);
+    } catch {
+      /* ignore */
+    }
+    if (name === "amber") {
+      document.documentElement.removeAttribute("data-accent");
+    } else {
+      document.documentElement.setAttribute("data-accent", name);
+    }
+    set({ accent: name });
   },
 
   view: "inbox",

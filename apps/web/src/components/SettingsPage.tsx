@@ -11,11 +11,21 @@ import { RulesManager } from "@/components/RulesManager";
 import { pushSupported, pushEnabled, enablePush, disablePush } from "@/lib/push";
 import { cn } from "@/lib/utils";
 
+const ACCENTS: { name: string; label: string; color: string }[] = [
+  { name: "amber", label: "Amber", color: "#b4632a" },
+  { name: "blue", label: "Blue", color: "#2563eb" },
+  { name: "emerald", label: "Emerald", color: "#059669" },
+  { name: "violet", label: "Violet", color: "#7c3aed" },
+  { name: "rose", label: "Rose", color: "#e11d48" },
+  { name: "teal", label: "Teal", color: "#0d9488" },
+  { name: "orange", label: "Orange", color: "#ea580c" },
+];
+
 export function SettingsPage() {
   const navigate = useNavigate();
   const settings = useSettings();
   const save = useSetSettings();
-  const { theme, toggleTheme } = useUI();
+  const { theme, toggleTheme, accent, setAccent } = useUI();
 
   const s = settings.data;
 
@@ -132,6 +142,37 @@ export function SettingsPage() {
               {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
               {theme === "dark" ? "Dark" : "Light"}
             </button>
+          </Section>
+
+          {/* Accent color */}
+          <Section
+            icon={<Palette size={18} />}
+            title="Accent color"
+            desc="Pick the highlight color used across the app."
+            stack
+          >
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {ACCENTS.map((a) => {
+                const active = accent === a.name;
+                return (
+                  <button
+                    key={a.name}
+                    onClick={() => setAccent(a.name)}
+                    aria-label={a.label}
+                    title={a.label}
+                    className={cn(
+                      "grid h-9 w-9 place-items-center rounded-full text-white transition-transform hover:scale-110",
+                      active
+                        ? "ring-2 ring-offset-2 ring-offset-elevated"
+                        : "ring-1 ring-black/10",
+                    )}
+                    style={{ background: a.color, ...(active ? { ["--tw-ring-color" as string]: a.color } : {}) }}
+                  >
+                    {active && <Check size={16} strokeWidth={3} />}
+                  </button>
+                );
+              })}
+            </div>
           </Section>
 
           {/* Signature */}

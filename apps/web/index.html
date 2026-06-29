@@ -35,6 +35,10 @@
           if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
             document.documentElement.classList.add("dark");
           }
+          var a = localStorage.getItem("aria-accent");
+          if (a && a !== "amber") {
+            document.documentElement.setAttribute("data-accent", a);
+          }
         } catch (e) {}
       })();
     </script>

@@ -71,6 +71,101 @@
   --shadow-lg: 0 30px 70px -20px rgb(0 0 0 / 0.75);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Accent presets — user-selectable via `data-accent` on <html>.
+   No attribute (or data-accent="amber") = the burnt-amber default above.
+   Each preset overrides the 5 accent vars for light; `.dark[...]` for dark.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-accent="blue"] {
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-fg: #ffffff;
+  --accent-soft: #dbeafe;
+  --accent-ring: #60a5fa;
+}
+.dark[data-accent="blue"] {
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-fg: #0b1220;
+  --accent-soft: #1c2740;
+  --accent-ring: #2563eb;
+}
+
+[data-accent="emerald"] {
+  --accent: #059669;
+  --accent-hover: #047857;
+  --accent-fg: #ffffff;
+  --accent-soft: #d1fae5;
+  --accent-ring: #34d399;
+}
+.dark[data-accent="emerald"] {
+  --accent: #34d399;
+  --accent-hover: #6ee7b7;
+  --accent-fg: #04140d;
+  --accent-soft: #0f2a20;
+  --accent-ring: #059669;
+}
+
+[data-accent="violet"] {
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-fg: #ffffff;
+  --accent-soft: #ede9fe;
+  --accent-ring: #a78bfa;
+}
+.dark[data-accent="violet"] {
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --accent-fg: #14091f;
+  --accent-soft: #241a36;
+  --accent-ring: #7c3aed;
+}
+
+[data-accent="rose"] {
+  --accent: #e11d48;
+  --accent-hover: #be123c;
+  --accent-fg: #ffffff;
+  --accent-soft: #ffe4e8;
+  --accent-ring: #fb7185;
+}
+.dark[data-accent="rose"] {
+  --accent: #fb7185;
+  --accent-hover: #fda4af;
+  --accent-fg: #1f0a0f;
+  --accent-soft: #331a20;
+  --accent-ring: #e11d48;
+}
+
+[data-accent="teal"] {
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-fg: #ffffff;
+  --accent-soft: #ccfbf1;
+  --accent-ring: #2dd4bf;
+}
+.dark[data-accent="teal"] {
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-fg: #04140f;
+  --accent-soft: #0c2a25;
+  --accent-ring: #0d9488;
+}
+
+[data-accent="orange"] {
+  --accent: #ea580c;
+  --accent-hover: #c2410c;
+  --accent-fg: #ffffff;
+  --accent-soft: #ffedd5;
+  --accent-ring: #fb923c;
+}
+.dark[data-accent="orange"] {
+  --accent: #fb923c;
+  --accent-hover: #fdba74;
+  --accent-fg: #1f0d04;
+  --accent-soft: #331f0f;
+  --accent-ring: #ea580c;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
