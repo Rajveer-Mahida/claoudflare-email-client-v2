@@ -48,9 +48,10 @@
     "FORWARD_TO": "rajveer.mahida@groovyweb.co",
     "FALLBACK_FORWARD_TO": "rajveermahida.dev@gmail.com",
     "VAPID_SUBJECT": "mailto:google@swisstrustlayer.ch",
-    "VAPID_PUBLIC_KEY": "BK39lEZNlzqOZVBx_q2-IwCDXxsMhsv6i9f8hGYjbgIh3KrpUmuFrurLSn7w_bxcNL3sbFKlEtLMmq3Gu__uvo0"
+    "VAPID_PUBLIC_KEY": "BK39lEZNlzqOZVBx_q2-IwCDXxsMhsv6i9f8hGYjbgIh3KrpUmuFrurLSn7w_bxcNL3sbFKlEtLMmq3Gu__uvo0",
+    "AI_MODEL": "claude-haiku-4-5"
   }
-  // Secret: VAPID_PRIVATE_JWK (the P-256 private JWK for signing push JWTs)
+  // Secrets: VAPID_PRIVATE_JWK (push JWT signing), ANTHROPIC_API_KEY (AI features)
 
   // Secrets (set via `wrangler secret put`): AUTH_SECRET, AUTH_PASSWORD
 }

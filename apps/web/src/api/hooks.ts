@@ -318,6 +318,14 @@ export function useDeleteDraft() {
   });
 }
 
+export function useSummarize() {
+  return useMutation({ mutationFn: (messageId: string) => api.summarize(messageId) });
+}
+
+export function useSmartReply() {
+  return useMutation({ mutationFn: (messageId: string) => api.smartReply(messageId) });
+}
+
 export function useSetSettings() {
   const qc = useQueryClient();
   return useMutation({

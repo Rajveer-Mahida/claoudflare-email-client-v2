@@ -39,6 +39,9 @@ export type Env = {
   VAPID_PUBLIC_KEY?: string;
   VAPID_SUBJECT?: string;
   VAPID_PRIVATE_JWK?: string;
+  // AI (Claude)
+  ANTHROPIC_API_KEY?: string;
+  AI_MODEL?: string;
 };
 
 /** Hono context env shape. */

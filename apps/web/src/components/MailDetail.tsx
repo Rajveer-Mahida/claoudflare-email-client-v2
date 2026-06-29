@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -20,11 +20,23 @@ import {
   ImageOff,
   Clock3,
   XCircle,
+  Sparkles,
+  MessageSquareText,
+  X as XIcon,
 } from "lucide-react";
 import type { MessageRow, AttachmentRow } from "@email/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMessage, useFlag, useMarkRead, useSnooze, useSoftDelete, useSettings } from "@/api/hooks";
-import { api } from "@/api/client";
+import {
+  useMessage,
+  useFlag,
+  useMarkRead,
+  useSnooze,
+  useSoftDelete,
+  useSettings,
+  useSummarize,
+  useSmartReply,
+} from "@/api/hooks";
+import { api, ApiError } from "@/api/client";
 import { useUI } from "@/lib/store";
 import { Avatar, IconButton, Tip, Spinner } from "@/components/primitives";
 import { SnoozeMenu } from "@/components/SnoozeMenu";
@@ -63,7 +75,33 @@ export function MailDetail() {
   const snooze = useSnooze();
   const del = useSoftDelete();
   const { emailTheme, toggleEmailTheme, openCompose } = useUI();
+  const summarize = useSummarize();
+  const smartReply = useSmartReply();
+  const [summary, setSummary] = useState<string | null>(null);
+  const [replies, setReplies] = useState<string[] | null>(null);
   const [replying, setReplying] = useState(false);
+
+  function aiError(e: unknown, fallback: string) {
+    toast.error(e instanceof ApiError && e.status === 503 ? "AI not set up yet" : fallback);
+  }
+  function onSummarize() {
+    setSummary(null);
+    summarize.mutate(id, {
+      onSuccess: (d) => setSummary(d.summary),
+      onError: (e) => aiError(e, "Couldn't summarize"),
+    });
+  }
+  function onSmartReply() {
+    setReplies(null);
+    smartReply.mutate(id, {
+      onSuccess: (d) => setReplies(d.replies),
+      onError: (e) => aiError(e, "Couldn't draft replies"),
+    });
+  }
+  useEffect(() => {
+    setSummary(null);
+    setReplies(null);
+  }, [id]);
 
   function back() {
     navigate({ to: "/" });
@@ -219,6 +257,11 @@ export function MailDetail() {
           </IconButton>
         </Tip>
 
+        <Tip label="Summarize">
+          <IconButton onClick={onSummarize} aria-label="Summarize" active={summarize.isPending}>
+            {summarize.isPending ? <Spinner /> : <Sparkles size={18} />}
+          </IconButton>
+        </Tip>
         <Tip label="Reply all">
           <IconButton onClick={onReplyAll} aria-label="Reply all">
             <ReplyAll size={18} />
@@ -249,6 +292,32 @@ export function MailDetail() {
       {/* scroll body */}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         <div className="w-full px-3 py-6 md:px-6">
+          <AnimatePresence>
+            {summary && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-5 overflow-hidden"
+              >
+                <div className="rounded-2xl border border-accent-ring/40 bg-accent-soft/60 p-4">
+                  <div className="mb-1.5 flex items-center gap-2 text-accent">
+                    <Sparkles size={15} />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Summary</span>
+                    <button
+                      onClick={() => setSummary(null)}
+                      className="ml-auto text-faint hover:text-fg"
+                      aria-label="Dismiss summary"
+                    >
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                  <p className="text-[14px] leading-relaxed text-fg">{summary}</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {labels.map((l) => (
               <span
@@ -295,15 +364,48 @@ export function MailDetail() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-3 px-5 py-3 md:px-8"
+              className="px-5 py-3 md:px-8"
             >
-              <button
-                onClick={() => setReplying(true)}
-                className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg"
-              >
-                <ReplyIcon size={16} />
-                Reply to {displayName(message.from_name, replyPeer)}…
-              </button>
+              {replies && replies.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {replies.map((r, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const subj = message.subject ?? "";
+                        openCompose({
+                          to: [replyPeer],
+                          subject: /^re:/i.test(subj) ? subj : `Re: ${subj}`,
+                          text: r,
+                          inReplyToMessageId: message.id,
+                        });
+                      }}
+                      className="max-w-full truncate rounded-full border border-accent-ring/50 bg-accent-soft/50 px-3 py-1.5 text-left text-[13px] text-fg transition hover:bg-accent-soft"
+                      title={r}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setReplying(true)}
+                  className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg"
+                >
+                  <ReplyIcon size={16} />
+                  Reply to {displayName(message.from_name, replyPeer)}…
+                </button>
+                <button
+                  onClick={onSmartReply}
+                  disabled={smartReply.isPending}
+                  className="flex items-center gap-1.5 rounded-full border border-border bg-bg px-3.5 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg disabled:opacity-60"
+                  title="Suggest replies"
+                >
+                  {smartReply.isPending ? <Spinner /> : <MessageSquareText size={16} />}
+                  <span className="hidden sm:inline">Suggest</span>
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

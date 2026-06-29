@@ -125,6 +125,12 @@ export const api = {
     req<DraftRow>("/api/drafts", body(data)),
   deleteDraft: (id: string) =>
     req<{ ok: true }>(`/api/drafts/${id}`, { method: "DELETE" }),
+  // ai
+  summarize: (messageId: string) =>
+    req<{ summary: string }>("/api/ai/summarize", body({ messageId })),
+  smartReply: (messageId: string) =>
+    req<{ replies: string[] }>("/api/ai/smart-reply", body({ messageId })),
+
   // push
   getPushKey: () => req<{ key: string }>("/api/push/key"),
   pushSubscribe: (sub: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }) =>
