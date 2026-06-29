@@ -31,6 +31,11 @@ export type Env = {
   ALIAS_SUFFIX?: string;
   AUTH_SECRET?: string;
   AUTH_PASSWORD?: string;
+  // Cloudflare Access (Zero Trust) email gate — when ACCESS_AUD is set the
+  // worker verifies the Access JWT instead of the password session.
+  ACCESS_TEAM_DOMAIN?: string; // e.g. rajveer.cloudflareaccess.com
+  ACCESS_AUD?: string; // Access application Audience (AUD) tag
+  ALLOWED_EMAILS?: string; // comma-separated allowlist (empty = any Access-verified email)
   // inbound email ingestion
   ALIAS_PATTERN?: string;
   FORWARD_TO?: string;
@@ -45,4 +50,4 @@ export type Env = {
 };
 
 /** Hono context env shape. */
-export type HonoEnv = { Bindings: Env };
+export type HonoEnv = { Bindings: Env; Variables: { email?: string | null } };

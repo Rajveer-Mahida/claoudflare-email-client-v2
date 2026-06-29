@@ -49,9 +49,9 @@ const body = (data: unknown) => ({ method: "POST", body: JSON.stringify(data) })
 
 export const api = {
   // auth
-  me: () => req<{ ok: true }>("/api/auth/me"),
+  me: () => req<{ ok: true; email?: string | null }>("/api/auth/me"),
   login: (password: string) => req<{ ok: true }>("/api/auth/login", body({ password })),
-  logout: () => req<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+  logout: () => req<{ ok: true; logoutUrl?: string }>("/api/auth/logout", { method: "POST" }),
 
   // reads
   counts: () => req<CountsResponse>("/api/counts"),

@@ -26,7 +26,7 @@ function Lazy({ children }: { children: React.ReactNode }) {
   return (
     <Suspense
       fallback={
-        <div className="grid h-full place-items-center">
+        <div className="grid h-full w-full flex-1 place-items-center">
           <Spinner className="text-accent" />
         </div>
       }

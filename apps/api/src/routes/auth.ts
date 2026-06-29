@@ -25,8 +25,16 @@ auth.post("/login", async (c) => {
 
 auth.post("/logout", (c) => {
   deleteCookie(c, cookieName(), { path: "/" });
+  // In Access mode, also bounce through the Cloudflare Access logout endpoint.
+  if (c.env.ACCESS_TEAM_DOMAIN && c.env.ACCESS_AUD) {
+    return c.json({
+      ok: true,
+      logoutUrl: `https://${c.env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`,
+    });
+  }
   return c.json({ ok: true });
 });
 
-// Lightweight session probe for the SPA's auth gate.
-auth.get("/me", (c) => c.json({ ok: true }));
+// Lightweight session probe for the SPA's auth gate; returns the signed-in
+// email when Access verified it.
+auth.get("/me", (c) => c.json({ ok: true, email: c.get("email") ?? null }));

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import type { HonoEnv, Env } from "./env";
 import { verifySessionToken, cookieName } from "./auth";
+import { accessEnabled, verifyAccessJwt, emailAllowed } from "./access";
 import { handleEmail } from "./email-handler";
 import { runScheduled } from "./scheduled";
 import { auth } from "./routes/auth";
@@ -26,6 +27,19 @@ const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/health"]);
 app.use("/api/*", async (c, next) => {
   if (PUBLIC_PATHS.has(c.req.path)) return next();
 
+  // Access mode: verify the Cloudflare Access JWT + allowlist (no password).
+  if (accessEnabled(c.env)) {
+    const token =
+      c.req.header("Cf-Access-Jwt-Assertion") || getCookie(c, "CF_Authorization");
+    const email = token ? await verifyAccessJwt(c.env, token) : null;
+    if (email && emailAllowed(c.env, email)) {
+      c.set("email", email);
+      return next();
+    }
+    return c.json({ error: "access denied" }, 401);
+  }
+
+  // Fallback (Access not configured / local dev): password session cookie.
   const token = getCookie(c, cookieName());
   if (token) {
     try {
