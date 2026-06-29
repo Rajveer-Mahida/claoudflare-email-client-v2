@@ -338,7 +338,7 @@ export function MailDetail() {
               </span>
             ))}
           </div>
-          <h1 className="mb-5 font-display text-[1.7rem] font-semibold leading-tight tracking-tight text-balance">
+          <h1 className="mb-5 font-display text-[1.35rem] font-semibold leading-tight tracking-tight text-balance md:text-[1.7rem]">
             {message.subject || "(no subject)"}
           </h1>
 
