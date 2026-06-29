@@ -48,6 +48,24 @@ function flashThemeAnim() {
   themeAnimTimer = setTimeout(() => el.classList.remove("theme-anim"), 420);
 }
 
+// Smoothly apply a theme/accent DOM change. Prefers the View Transitions API
+// (GPU crossfade of the whole page — no per-node repaint jank); falls back to
+// the broad CSS transition where unsupported.
+function applyThemeChange(mutate: () => void) {
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => unknown;
+  };
+  const reduce =
+    typeof matchMedia !== "undefined" &&
+    !matchMedia("(prefers-reduced-motion: no-preference)").matches;
+  if (doc.startViewTransition && !reduce) {
+    doc.startViewTransition(mutate);
+  } else {
+    flashThemeAnim();
+    mutate();
+  }
+}
+
 type UIState = {
   theme: Theme;
   toggleTheme: () => void;
@@ -97,8 +115,9 @@ export const useUI = create<UIState>((set, get) => ({
   theme: initialTheme(),
   toggleTheme: () => {
     const next: Theme = get().theme === "dark" ? "light" : "dark";
-    flashThemeAnim();
-    document.documentElement.classList.toggle("dark", next === "dark");
+    applyThemeChange(() => {
+      document.documentElement.classList.toggle("dark", next === "dark");
+    });
     try {
       localStorage.setItem("aria-theme", next);
     } catch {
@@ -120,17 +139,18 @@ export const useUI = create<UIState>((set, get) => ({
 
   accent: initialAccent(),
   setAccent: (name) => {
-    flashThemeAnim();
     try {
       localStorage.setItem("aria-accent", name);
     } catch {
       /* ignore */
     }
-    if (name === "amber") {
-      document.documentElement.removeAttribute("data-accent");
-    } else {
-      document.documentElement.setAttribute("data-accent", name);
-    }
+    applyThemeChange(() => {
+      if (name === "amber") {
+        document.documentElement.removeAttribute("data-accent");
+      } else {
+        document.documentElement.setAttribute("data-accent", name);
+      }
+    });
     set({ accent: name });
   },
 
