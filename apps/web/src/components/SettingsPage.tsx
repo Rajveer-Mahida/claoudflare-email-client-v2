@@ -15,6 +15,10 @@ const ACCENTS: { name: string; label: string; color: string }[] = [
   { name: "amber", label: "Amber", color: "#b4632a" },
   { name: "orange", label: "Orange", color: "#c2410c" },
   { name: "pink", label: "Pink", color: "#db2777" },
+  { name: "blue", label: "Blue", color: "#1d4ed8" },
+  { name: "teal", label: "Teal", color: "#0f766e" },
+  { name: "emerald", label: "Emerald", color: "#047857" },
+  { name: "violet", label: "Violet", color: "#6d28d9" },
 ];
 
 export function SettingsPage() {
