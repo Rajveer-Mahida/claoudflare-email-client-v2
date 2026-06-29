@@ -75,6 +75,9 @@ export function MailDetail() {
   const snooze = useSnooze();
   const del = useSoftDelete();
   const { emailTheme, toggleEmailTheme, openCompose } = useUI();
+  const settings = useSettings();
+  const replyOn = !!settings.data?.reply_enabled;
+  const composeOn = settings.data?.compose_enabled ?? true;
   const summarize = useSummarize();
   const smartReply = useSmartReply();
   const [summary, setSummary] = useState<string | null>(null);
@@ -153,6 +156,7 @@ export function MailDetail() {
   }
 
   function onForward() {
+    if (!composeOn) return toast.error("Compose is disabled in Settings");
     const atts = (attachments[message.id] ?? []).map((a) => ({
       key: a.r2_key,
       filename: a.filename ?? "file",
@@ -170,6 +174,7 @@ export function MailDetail() {
   }
 
   function onReplyAll() {
+    if (!composeOn) return toast.error("Compose is disabled in Settings");
     const ourAlias = (message.direction === "in" ? message.to_addr : message.from_addr).toLowerCase();
     const cc = [message.to_addr, message.cc]
       .filter(Boolean)
@@ -263,12 +268,12 @@ export function MailDetail() {
           </IconButton>
         </Tip>
         <Tip label="Reply all">
-          <IconButton onClick={onReplyAll} aria-label="Reply all">
+          <IconButton onClick={onReplyAll} aria-label="Reply all" disabled={!composeOn}>
             <ReplyAll size={18} />
           </IconButton>
         </Tip>
         <Tip label="Forward">
-          <IconButton onClick={onForward} aria-label="Forward">
+          <IconButton onClick={onForward} aria-label="Forward" disabled={!composeOn}>
             <Forward size={18} />
           </IconButton>
         </Tip>
@@ -366,7 +371,7 @@ export function MailDetail() {
               exit={{ opacity: 0 }}
               className="px-5 py-3 md:px-8"
             >
-              {replies && replies.length > 0 && (
+              {composeOn && replies && replies.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {replies.map((r, i) => (
                     <button
@@ -390,21 +395,26 @@ export function MailDetail() {
               )}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setReplying(true)}
-                  className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg"
+                  onClick={() => replyOn && setReplying(true)}
+                  disabled={!replyOn}
+                  className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border disabled:hover:text-muted"
                 >
                   <ReplyIcon size={16} />
-                  Reply to {displayName(message.from_name, replyPeer)}…
+                  {replyOn
+                    ? `Reply to ${displayName(message.from_name, replyPeer)}…`
+                    : "Replies are disabled in Settings"}
                 </button>
-                <button
-                  onClick={onSmartReply}
-                  disabled={smartReply.isPending}
-                  className="flex items-center gap-1.5 rounded-full border border-border bg-bg px-3.5 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg disabled:opacity-60"
-                  title="Suggest replies"
-                >
-                  {smartReply.isPending ? <Spinner /> : <MessageSquareText size={16} />}
-                  <span className="hidden sm:inline">Suggest</span>
-                </button>
+                {composeOn && (
+                  <button
+                    onClick={onSmartReply}
+                    disabled={smartReply.isPending}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-bg px-3.5 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg disabled:opacity-60"
+                    title="Suggest replies"
+                  >
+                    {smartReply.isPending ? <Spinner /> : <MessageSquareText size={16} />}
+                    <span className="hidden sm:inline">Suggest</span>
+                  </button>
+                )}
               </div>
             </motion.div>
           )}

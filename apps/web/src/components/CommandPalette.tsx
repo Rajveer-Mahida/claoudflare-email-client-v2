@@ -121,9 +121,11 @@ export function CommandPalette() {
               )}
 
               <Command.Group heading="Actions">
-                <Item onSelect={() => { openCompose(); close(); }} icon={<PenLine size={16} />}>
-                  Compose
-                </Item>
+                {(settings.data?.compose_enabled ?? true) && (
+                  <Item onSelect={() => { openCompose(); close(); }} icon={<PenLine size={16} />}>
+                    Compose
+                  </Item>
+                )}
                 <Item onSelect={newAlias} icon={<Sparkles size={16} />}>
                   New alias
                 </Item>

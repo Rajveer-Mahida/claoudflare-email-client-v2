@@ -53,6 +53,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         "inline-grid h-9 w-9 place-items-center rounded-full text-muted",
         "transition-all duration-150 active:scale-90 hover:bg-inset hover:text-fg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring/60",
+        "disabled:pointer-events-none disabled:opacity-40",
         active && "text-accent",
         className,
       )}
