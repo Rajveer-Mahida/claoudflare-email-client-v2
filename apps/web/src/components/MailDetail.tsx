@@ -23,9 +23,11 @@ import {
   Sparkles,
   MessageSquareText,
   X as XIcon,
+  Eye,
+  MailX,
 } from "lucide-react";
 import type { MessageRow, AttachmentRow } from "@email/shared";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   useMessage,
   useFlag,
@@ -42,6 +44,7 @@ import { Avatar, IconButton, Tip, Spinner } from "@/components/primitives";
 import { SnoozeMenu } from "@/components/SnoozeMenu";
 import { LabelMenu } from "@/components/LabelMenu";
 import { ReplyComposer } from "@/components/ReplyComposer";
+import { AttachmentLightbox, isPreviewable } from "@/components/AttachmentLightbox";
 import { useShortcuts } from "@/lib/useShortcuts";
 import { renderEmailHtml } from "@/lib/sanitize";
 import { formatFullDate, formatBytes, displayName } from "@/lib/utils";
@@ -80,6 +83,32 @@ export function MailDetail() {
   const composeOn = settings.data?.compose_enabled ?? true;
   const summarize = useSummarize();
   const smartReply = useSmartReply();
+  const inbound = data?.message.direction === "in";
+  const unsub = useQuery({
+    queryKey: ["unsub", id],
+    queryFn: () => api.unsubscribeInfo(id),
+    enabled: inbound,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const hasUnsub = !!(unsub.data && (unsub.data.http || unsub.data.mailto));
+  async function onUnsubscribe() {
+    const u = unsub.data;
+    if (!u) return;
+    if (u.oneClick && u.http) {
+      try {
+        await api.unsubscribeOneClick(id);
+        toast.success("Unsubscribed");
+      } catch {
+        toast.error("Couldn't auto-unsubscribe — opening link");
+        window.open(u.http, "_blank", "noopener");
+      }
+    } else if (u.http) {
+      window.open(u.http, "_blank", "noopener");
+    } else if (u.mailto) {
+      window.location.href = u.mailto;
+    }
+  }
   const [summary, setSummary] = useState<string | null>(null);
   const [replies, setReplies] = useState<string[] | null>(null);
   const [replying, setReplying] = useState(false);
@@ -262,6 +291,14 @@ export function MailDetail() {
           </IconButton>
         </Tip>
 
+        {hasUnsub && (
+          <Tip label="Unsubscribe">
+            <IconButton onClick={onUnsubscribe} aria-label="Unsubscribe">
+              <MailX size={18} />
+            </IconButton>
+          </Tip>
+        )}
+
         <Tip label="Summarize">
           <IconButton onClick={onSummarize} aria-label="Summarize" active={summarize.isPending}>
             {summarize.isPending ? <Spinner /> : <Sparkles size={18} />}
@@ -442,6 +479,8 @@ function ThreadMessage({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [loadImages, setLoadImages] = useState(() => loadedImageSet().has(m.id));
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  const previewable = attachments.filter(isPreviewable);
   const emailTheme = useUI((s) => s.emailTheme);
   const settings = useSettings();
   const qc = useQueryClient();
@@ -562,34 +601,60 @@ function ThreadMessage({
 
               {attachments.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {attachments.map((a) => (
-                    <AttachmentPill key={a.id} a={a} />
-                  ))}
+                  {attachments.map((a) => {
+                    const pIdx = previewable.indexOf(a);
+                    return (
+                      <AttachmentPill
+                        key={a.id}
+                        a={a}
+                        onPreview={pIdx >= 0 ? () => setPreviewIdx(pIdx) : undefined}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AttachmentLightbox
+        items={previewable}
+        index={previewIdx}
+        onIndex={setPreviewIdx}
+        onClose={() => setPreviewIdx(null)}
+      />
     </div>
   );
 }
 
-function AttachmentPill({ a }: { a: AttachmentRow }) {
-  return (
-    <a
-      href={`/api/attachments/${a.r2_key}`}
-      target="_blank"
-      rel="noreferrer"
-      className="group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 transition hover:border-accent-ring"
-    >
+function AttachmentPill({ a, onPreview }: { a: AttachmentRow; onPreview?: () => void }) {
+  const inner = (
+    <>
       <span className="grid h-9 w-9 place-items-center rounded-lg bg-inset text-muted">
-        <Paperclip size={16} />
+        {onPreview ? <Eye size={16} /> : <Paperclip size={16} />}
       </span>
       <span className="min-w-0">
         <span className="block max-w-44 truncate text-[13px] font-medium">{a.filename ?? "attachment"}</span>
         <span className="text-[11px] text-faint">{formatBytes(a.size_bytes)}</span>
       </span>
+    </>
+  );
+  const cls =
+    "group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 text-left transition hover:border-accent-ring";
+
+  // previewable → open lightbox; otherwise plain download link
+  if (onPreview) {
+    return (
+      <button onClick={onPreview} className={cls}>
+        {inner}
+        <Eye size={15} className="ml-1 text-faint opacity-0 transition group-hover:opacity-100" />
+      </button>
+    );
+  }
+  return (
+    <a href={`/api/attachments/${a.r2_key}`} target="_blank" rel="noreferrer" className={cls}>
+      {inner}
       <Download size={15} className="ml-1 text-faint opacity-0 transition group-hover:opacity-100" />
     </a>
   );

@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import PostalMime from "postal-mime";
+import type { Context } from "hono";
 import type { HonoEnv } from "../env";
 import type {
   MessageListItem,
@@ -73,6 +75,55 @@ messages.get("/:id", async (c) => {
     labels: labelMap.get(id) ?? [],
   };
   return c.json(detail);
+});
+
+// ── One-click unsubscribe (RFC 2369 / 8058) ────────────────────────────────
+// List-Unsubscribe headers aren't stored at ingest; parse them on demand from
+// the raw .eml in R2 (cheap, rare operation).
+function parseUnsub(value: string): { http: string | null; mailto: string | null } {
+  let http: string | null = null;
+  let mailto: string | null = null;
+  for (const m of value.match(/<([^>]+)>/g) ?? []) {
+    const url = m.slice(1, -1).trim();
+    if (/^https?:/i.test(url)) http ??= url;
+    else if (/^mailto:/i.test(url)) mailto ??= url;
+  }
+  return { http, mailto };
+}
+
+async function unsubInfo(c: Context<HonoEnv>, id: string) {
+  const msg = await getMessage(c.env.DB, id);
+  if (!msg?.raw_key) return null;
+  const obj = await c.env.EMAIL_CACHE.get(msg.raw_key);
+  if (!obj) return null;
+  const parsed = await new PostalMime().parse(await obj.arrayBuffer());
+  const headers = parsed.headers ?? [];
+  const lu = headers.find((h) => h.key === "list-unsubscribe")?.value;
+  if (!lu) return { http: null, mailto: null, oneClick: false };
+  const lup = headers.find((h) => h.key === "list-unsubscribe-post")?.value;
+  return { ...parseUnsub(lu), oneClick: !!lup && /one-click/i.test(lup) };
+}
+
+// GET → what unsubscribe options this message offers
+messages.get("/:id/unsubscribe", async (c) => {
+  const info = await unsubInfo(c, c.req.param("id"));
+  return c.json(info ?? { http: null, mailto: null, oneClick: false });
+});
+
+// POST → perform the RFC 8058 one-click POST server-side (avoids browser CORS)
+messages.post("/:id/unsubscribe", async (c) => {
+  const info = await unsubInfo(c, c.req.param("id"));
+  if (!info?.http) return c.json({ error: "no http unsubscribe target" }, 400);
+  try {
+    const res = await fetch(info.http, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "List-Unsubscribe=One-Click",
+    });
+    return c.json({ ok: res.ok, status: res.status });
+  } catch {
+    return c.json({ error: "request failed" }, 502);
+  }
 });
 
 messages.post("/mark-read", async (c) => {

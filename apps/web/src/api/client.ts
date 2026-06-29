@@ -75,6 +75,12 @@ export const api = {
     return req<MessageListItem[]>(`/api/messages?${qs.toString()}`);
   },
   message: (id: string) => req<MessageDetail>(`/api/messages/${id}`),
+  unsubscribeInfo: (id: string) =>
+    req<{ http: string | null; mailto: string | null; oneClick: boolean }>(
+      `/api/messages/${id}/unsubscribe`,
+    ),
+  unsubscribeOneClick: (id: string) =>
+    req<{ ok: boolean; status?: number }>(`/api/messages/${id}/unsubscribe`, { method: "POST" }),
 
   // mutations
   flag: (ids: string[], field: FlagField, value: 0 | 1) =>
