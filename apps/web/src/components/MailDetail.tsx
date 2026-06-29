@@ -267,16 +267,20 @@ export function MailDetail() {
             {summarize.isPending ? <Spinner /> : <Sparkles size={18} />}
           </IconButton>
         </Tip>
-        <Tip label="Reply all">
-          <IconButton onClick={onReplyAll} aria-label="Reply all" disabled={!composeOn}>
-            <ReplyAll size={18} />
-          </IconButton>
-        </Tip>
-        <Tip label="Forward">
-          <IconButton onClick={onForward} aria-label="Forward" disabled={!composeOn}>
-            <Forward size={18} />
-          </IconButton>
-        </Tip>
+        {composeOn && (
+          <>
+            <Tip label="Reply all">
+              <IconButton onClick={onReplyAll} aria-label="Reply all">
+                <ReplyAll size={18} />
+              </IconButton>
+            </Tip>
+            <Tip label="Forward">
+              <IconButton onClick={onForward} aria-label="Forward">
+                <Forward size={18} />
+              </IconButton>
+            </Tip>
+          </>
+        )}
 
         <div className="ml-auto flex items-center gap-1">
           <Tip label={emailTheme === "dark" ? "Light email" : "Dark email"}>
@@ -352,7 +356,8 @@ export function MailDetail() {
         </div>
       </div>
 
-      {/* reply */}
+      {/* reply — hidden entirely when both reply and compose are off */}
+      {(replyOn || composeOn) && (
       <div className="border-t border-border bg-surface">
         <AnimatePresence mode="wait">
           {replying ? (
@@ -394,16 +399,15 @@ export function MailDetail() {
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => replyOn && setReplying(true)}
-                  disabled={!replyOn}
-                  className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border disabled:hover:text-muted"
-                >
-                  <ReplyIcon size={16} />
-                  {replyOn
-                    ? `Reply to ${displayName(message.from_name, replyPeer)}…`
-                    : "Replies are disabled in Settings"}
-                </button>
+                {replyOn && (
+                  <button
+                    onClick={() => setReplying(true)}
+                    className="flex flex-1 items-center gap-2.5 rounded-full border border-border bg-bg px-4 py-2.5 text-sm text-muted transition hover:border-accent-ring hover:text-fg"
+                  >
+                    <ReplyIcon size={16} />
+                    Reply to {displayName(message.from_name, replyPeer)}…
+                  </button>
+                )}
                 {composeOn && (
                   <button
                     onClick={onSmartReply}
@@ -420,6 +424,7 @@ export function MailDetail() {
           )}
         </AnimatePresence>
       </div>
+      )}
     </motion.div>
   );
 }
