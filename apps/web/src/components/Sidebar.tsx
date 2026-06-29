@@ -179,6 +179,8 @@ export function Sidebar() {
         {!collapsed && <span className="text-[13px]">New alias</span>}
       </button>
 
+      {/* Scrollable nav (views + labels) */}
+      <div className="scroll-thin -mr-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-2">
       {/* Views */}
       <nav className="flex flex-col gap-0.5">
         {VIEW_META.map(({ view: v, label, icon: Icon, countKey }) => {
@@ -242,9 +244,10 @@ export function Sidebar() {
           </nav>
         </div>
       )}
+      </div>
 
-      {/* Footer */}
-      <div className="mt-auto flex flex-col gap-0.5 pt-3">
+      {/* Footer (pinned) */}
+      <div className="flex flex-col gap-0.5 border-t border-border pt-3">
         <SideItem
           active={onSettings}
           collapsed={collapsed}
