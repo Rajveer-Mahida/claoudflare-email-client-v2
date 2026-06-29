@@ -73,14 +73,14 @@ export function MessageList({
   return (
     <div className="scroll-thin h-full overflow-y-auto p-2">
       <AnimatePresence initial={false}>
-        {items.map((m, i) => (
+        {items.map((m) => (
           <motion.div
             key={m.id}
             layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i * 0.01, 0.15) } }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.2 } }}
-            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
           >
             <MessageRow message={m} active={activeId === m.id} focused={focusedId === m.id} />
           </motion.div>
