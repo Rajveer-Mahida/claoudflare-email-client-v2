@@ -31,6 +31,16 @@ export async function setReplyEnabled(db: DB, enabled: boolean): Promise<void> {
   await setSetting(db, "reply_enabled", enabled ? "1" : "0");
 }
 
+/** Compose/new-mail gate — defaults to enabled when unset. */
+export async function getComposeEnabled(db: DB): Promise<boolean> {
+  const v = await getSetting(db, "compose_enabled");
+  return v === null ? true : v === "1" || v === "true";
+}
+
+export async function setComposeEnabled(db: DB, enabled: boolean): Promise<void> {
+  await setSetting(db, "compose_enabled", enabled ? "1" : "0");
+}
+
 export function aliasDomains(env: Env): string[] {
   const list = env.ALIAS_DOMAINS ?? env.ALIAS_DOMAIN ?? "rajveer.space";
   return list

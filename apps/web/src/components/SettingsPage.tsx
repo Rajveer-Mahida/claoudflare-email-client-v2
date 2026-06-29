@@ -25,7 +25,7 @@ export function SettingsPage() {
   }, [s?.signature]);
 
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
+    <div className="scroll-thin h-full min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 py-8 md:px-10">
         <button
           onClick={() => navigate({ to: "/" })}
@@ -45,6 +45,22 @@ export function SettingsPage() {
                 save.mutate(
                   { reply_enabled: v },
                   { onSuccess: () => toast.success(v ? "Replies enabled" : "Replies disabled") },
+                )
+              }
+              className="relative h-7 w-12 rounded-full bg-border-strong transition-colors data-[state=checked]:bg-accent"
+            >
+              <Switch.Thumb className="block h-5 w-5 translate-x-1 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-6" />
+            </Switch.Root>
+          </Section>
+
+          {/* Compose */}
+          <Section icon={<PenLine size={18} />} title="Compose" desc="Allow composing and forwarding new emails.">
+            <Switch.Root
+              checked={s?.compose_enabled ?? true}
+              onCheckedChange={(v) =>
+                save.mutate(
+                  { compose_enabled: v },
+                  { onSuccess: () => toast.success(v ? "Compose enabled" : "Compose disabled") },
                 )
               }
               className="relative h-7 w-12 rounded-full bg-border-strong transition-colors data-[state=checked]:bg-accent"

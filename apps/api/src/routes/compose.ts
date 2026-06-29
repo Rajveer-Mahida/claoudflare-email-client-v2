@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { HonoEnv, Env, EmailAttachmentOut } from "../env";
 import type { ComposeRequest, UploadedAttachment } from "@email/shared";
 import { recordOutbound, getMessage, deleteDraft } from "../db";
-import { getReplyEnabled } from "../settings";
+import { getComposeEnabled } from "../settings";
 
 export const compose = new Hono<HonoEnv>();
 
@@ -27,8 +27,8 @@ async function loadAttachments(
 
 // POST /api/send — new mail, reply-all, or forward (universal sender).
 compose.post("/", async (c) => {
-  if (!(await getReplyEnabled(c.env.DB))) {
-    return c.json({ error: "Sending disabled in settings" }, 403);
+  if (!(await getComposeEnabled(c.env.DB))) {
+    return c.json({ error: "Compose disabled in settings" }, 403);
   }
 
   const body = await c.req.json<ComposeRequest>().catch(() => null);

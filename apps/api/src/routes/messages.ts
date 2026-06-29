@@ -25,7 +25,6 @@ import {
   claimPendingMessage,
   markMessageSent,
 } from "../db";
-import { getReplyEnabled } from "../settings";
 
 const FLAG_FIELDS: FlagField[] = ["is_starred", "is_archived", "is_deleted", "is_read"];
 
@@ -166,9 +165,8 @@ messages.post("/send-now", async (c) => {
   const msg = await getMessage(c.env.DB, id);
   if (!msg) return c.json({ error: "not found" }, 404);
 
-  if (!(await getReplyEnabled(c.env.DB))) {
-    return c.json({ error: "Replies disabled in settings" }, 403);
-  }
+  // No gate here: the pending row was already authorized at creation
+  // (reply → reply_enabled, compose → compose_enabled). This is just the flush.
 
   const splitAddrs = (s: string | null) =>
     (s ?? "").split(",").map((x) => x.trim()).filter(Boolean);

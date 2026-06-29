@@ -3,6 +3,8 @@ import type { HonoEnv } from "../env";
 import {
   getReplyEnabled,
   setReplyEnabled,
+  getComposeEnabled,
+  setComposeEnabled,
   getPrimaryAliasDomain,
   setPrimaryAliasDomain,
   aliasDomains,
@@ -25,6 +27,7 @@ settings.get("/", async (c) => {
   const blockRaw = await getSetting(c.env.DB, "block_remote_images");
   return c.json({
     reply_enabled: await getReplyEnabled(c.env.DB),
+    compose_enabled: await getComposeEnabled(c.env.DB),
     primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env),
     alias_domains: aliasDomains(c.env),
     signature: (await getSetting(c.env.DB, "signature")) ?? "",
@@ -37,12 +40,18 @@ settings.post("/", async (c) => {
   const body = await c.req
     .json<{
       reply_enabled?: boolean;
+      compose_enabled?: boolean;
       primary_alias_domain?: string;
       signature?: string;
       block_remote_images?: boolean;
       allow_image_sender?: string;
     }>()
     .catch(() => ({}) as Record<string, never>);
+
+  if (typeof body.compose_enabled === "boolean") {
+    await setComposeEnabled(c.env.DB, body.compose_enabled);
+    return c.json({ ok: true, compose_enabled: body.compose_enabled });
+  }
 
   if (typeof body.block_remote_images === "boolean") {
     await setSetting(c.env.DB, "block_remote_images", body.block_remote_images ? "1" : "0");

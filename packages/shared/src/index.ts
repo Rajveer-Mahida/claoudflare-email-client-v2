@@ -87,6 +87,7 @@ export type MessageDetail = {
 
 export type SettingsResponse = {
   reply_enabled: boolean;
+  compose_enabled: boolean;
   primary_alias_domain: string;
   alias_domains: string[];
   signature: string;

@@ -110,6 +110,7 @@ export const api = {
 
   setSettings: (data: {
     reply_enabled?: boolean;
+    compose_enabled?: boolean;
     primary_alias_domain?: string;
     signature?: string;
     block_remote_images?: boolean;

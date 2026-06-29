@@ -142,7 +142,10 @@ export function Compose() {
     }
   }
 
+  const composeDisabled = settings.data && !settings.data.compose_enabled;
+
   async function doSend() {
+    if (composeDisabled) return toast.error("Compose is disabled in Settings");
     if (!to.length) return toast.error("Add a recipient");
     if (!subject.trim()) return toast.error("Add a subject");
     setBusy(true);
@@ -243,7 +246,7 @@ export function Compose() {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Write your message…"
+        placeholder={composeDisabled ? "Compose is disabled in Settings" : "Write your message…"}
         className="min-h-40 flex-1 resize-none bg-transparent px-3 py-3 text-[14px] leading-relaxed outline-none"
       />
 
@@ -283,7 +286,7 @@ export function Compose() {
       )}
 
       <div className="flex items-center gap-2 border-t border-border px-3 py-2.5">
-        <Button variant="primary" size="sm" onClick={doSend} disabled={busy || uploading > 0}>
+        <Button variant="primary" size="sm" onClick={doSend} disabled={busy || uploading > 0 || !!composeDisabled}>
           {busy ? <Spinner /> : <Send size={15} />}
           {showSchedule && scheduleAt ? "Schedule" : "Send"}
         </Button>

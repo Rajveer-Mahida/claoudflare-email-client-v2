@@ -41,7 +41,7 @@ export function AliasesPage() {
   }
 
   return (
-    <div className="scroll-thin h-full overflow-y-auto">
+    <div className="scroll-thin h-full min-w-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-2xl px-6 py-8 md:px-10">
         <button
           onClick={() => navigate({ to: "/" })}
