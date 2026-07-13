@@ -109,6 +109,10 @@ type UIState = {
   setPalette: (open: boolean) => void;
   helpOpen: boolean;
   setHelp: (open: boolean) => void;
+
+  // admin "act as" — the user whose data the (admin) session is currently viewing
+  actingAs: { id: string; email: string | null } | null;
+  setActingAs: (u: { id: string; email: string | null } | null) => void;
 };
 
 export const useUI = create<UIState>((set, get) => ({
@@ -195,4 +199,7 @@ export const useUI = create<UIState>((set, get) => ({
   setPalette: (open) => set({ paletteOpen: open }),
   helpOpen: false,
   setHelp: (open) => set({ helpOpen: open }),
+
+  actingAs: null,
+  setActingAs: (u) => set({ actingAs: u }),
 }));

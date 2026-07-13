@@ -27,6 +27,7 @@ import {
   claimPendingMessage,
   markMessageSent,
 } from "../db";
+import { effectiveOwner, writeOwner } from "../scope";
 
 const FLAG_FIELDS: FlagField[] = ["is_starred", "is_archived", "is_deleted", "is_read"];
 
@@ -41,9 +42,10 @@ messages.get("/", async (c) => {
   const to = c.req.query("to") ?? undefined;
   const limit = Number(c.req.query("limit") ?? "50");
   const offset = Number(c.req.query("offset") ?? "0");
+  const { owner } = effectiveOwner(c);
 
-  const rows = await listMessages(db, { view, q, labelId, to, limit, offset });
-  const labelMap = await labelsForMessages(db, rows.map((m) => m.id));
+  const rows = await listMessages(db, owner, { view, q, labelId, to, limit, offset });
+  const labelMap = await labelsForMessages(db, rows.map((m) => m.id), owner);
 
   const items: MessageListItem[] = rows.map(({ html: _h, text: _t, ...rest }) => ({
     ...rest,
@@ -56,16 +58,17 @@ messages.get("/", async (c) => {
 messages.get("/:id", async (c) => {
   const db = c.env.DB;
   const id = c.req.param("id");
-  const message = await getMessage(db, id);
+  const { owner } = effectiveOwner(c);
+  const message = await getMessage(db, id, owner);
   if (!message) return c.json({ error: "not found" }, 404);
 
   const threadKey = message.thread_id ?? message.message_id ?? message.id;
-  const thread = await getThread(db, threadKey);
+  const thread = await getThread(db, threadKey, owner);
   const messages = thread.length ? thread : [message];
 
   const [attachments, labelMap] = await Promise.all([
-    attachmentsForMessages(db, messages.map((m) => m.id)),
-    labelsForMessages(db, [id]),
+    attachmentsForMessages(db, messages.map((m) => m.id), owner),
+    labelsForMessages(db, [id], owner),
   ]);
 
   const detail: MessageDetail = {
@@ -92,7 +95,7 @@ function parseUnsub(value: string): { http: string | null; mailto: string | null
 }
 
 async function unsubInfo(c: Context<HonoEnv>, id: string) {
-  const msg = await getMessage(c.env.DB, id);
+  const msg = await getMessage(c.env.DB, id, effectiveOwner(c).owner);
   if (!msg?.raw_key) return null;
   const obj = await c.env.EMAIL_CACHE.get(msg.raw_key);
   if (!obj) return null;
@@ -131,14 +134,14 @@ messages.post("/mark-read", async (c) => {
     .json<{ id?: string; read?: boolean }>()
     .catch(() => ({}) as { id?: string; read?: boolean });
   if (!id) return c.json({ error: "id required" }, 400);
-  await markRead(c.env.DB, id, read !== false);
+  await markRead(c.env.DB, id, read !== false, effectiveOwner(c).owner);
   return c.json({ ok: true });
 });
 
 messages.post("/delete", async (c) => {
   const { id } = await c.req.json<{ id?: string }>().catch(() => ({}) as { id?: string });
   if (!id) return c.json({ error: "id required" }, 400);
-  await softDelete(c.env.DB, id);
+  await softDelete(c.env.DB, id, effectiveOwner(c).owner);
   return c.json({ ok: true });
 });
 
@@ -149,7 +152,7 @@ messages.post("/flag", async (c) => {
   if (!ids?.length || !field || !FLAG_FIELDS.includes(field as FlagField) || value === undefined) {
     return c.json({ error: "invalid params" }, 400);
   }
-  await setFlag(c.env.DB, ids, field as FlagField, value);
+  await setFlag(c.env.DB, ids, field as FlagField, value, effectiveOwner(c).owner);
   return c.json({ ok: true });
 });
 
@@ -160,7 +163,7 @@ messages.post("/snooze", async (c) => {
   if (!ids?.length || until === undefined) {
     return c.json({ error: "ids and until required" }, 400);
   }
-  await setSnooze(c.env.DB, ids, until);
+  await setSnooze(c.env.DB, ids, until, effectiveOwner(c).owner);
   return c.json({ ok: true });
 });
 
@@ -168,14 +171,14 @@ messages.post("/mark-all-read", async (c) => {
   const { view, labelId } = await c.req
     .json<{ view?: string; labelId?: string }>()
     .catch(() => ({}) as Record<string, never>);
-  await markAllRead(c.env.DB, { view: (view as ViewName) || "inbox", labelId });
+  await markAllRead(c.env.DB, effectiveOwner(c).owner, { view: (view as ViewName) || "inbox", labelId });
   return c.json({ ok: true });
 });
 
 messages.post("/permanent-delete", async (c) => {
   const { ids } = await c.req.json<{ ids?: string[] }>().catch(() => ({}) as { ids?: string[] });
   if (!ids?.length) return c.json({ error: "ids required" }, 400);
-  await permanentDeleteMessages(c.env.DB, ids);
+  await permanentDeleteMessages(c.env.DB, ids, effectiveOwner(c).owner);
   return c.json({ ok: true });
 });
 
@@ -186,7 +189,7 @@ messages.post("/labels", async (c) => {
   if (!messageIds?.length || !labelIds?.length) {
     return c.json({ error: "messageIds and labelIds required" }, 400);
   }
-  await applyLabels(c.env.DB, messageIds, labelIds);
+  await applyLabels(c.env.DB, writeOwner(c), messageIds, labelIds);
   return c.json({ ok: true });
 });
 
@@ -195,13 +198,15 @@ messages.delete("/labels", async (c) => {
     .json<{ messageId?: string; labelId?: string }>()
     .catch(() => ({}) as Record<string, never>);
   if (!messageId || !labelId) return c.json({ error: "messageId and labelId required" }, 400);
-  await removeLabel(c.env.DB, messageId, labelId);
+  await removeLabel(c.env.DB, writeOwner(c), messageId, labelId);
   return c.json({ ok: true });
 });
 
 messages.post("/cancel-send", async (c) => {
   const { id } = await c.req.json<{ id?: string }>().catch(() => ({}) as { id?: string });
   if (!id) return c.json({ error: "id required" }, 400);
+  const owned = await getMessage(c.env.DB, id, effectiveOwner(c).owner);
+  if (!owned) return c.json({ error: "not found" }, 404);
   const cancelled = await cancelPendingMessage(c.env.DB, id);
   return c.json({ ok: true, cancelled });
 });
@@ -210,10 +215,14 @@ messages.post("/send-now", async (c) => {
   const { id } = await c.req.json<{ id?: string }>().catch(() => ({}) as { id?: string });
   if (!id) return c.json({ error: "id required" }, 400);
 
+  const { owner } = effectiveOwner(c);
+  const owned = await getMessage(c.env.DB, id, owner);
+  if (!owned) return c.json({ error: "not found" }, 404);
+
   const claimed = await claimPendingMessage(c.env.DB, id);
   if (!claimed) return c.json({ ok: true, skipped: true });
 
-  const msg = await getMessage(c.env.DB, id);
+  const msg = await getMessage(c.env.DB, id, owner);
   if (!msg) return c.json({ error: "not found" }, 404);
 
   // No gate here: the pending row was already authorized at creation
@@ -224,7 +233,7 @@ messages.post("/send-now", async (c) => {
 
   try {
     // Pull stored attachment blobs back from R2 so compose attachments deliver.
-    const atts = await getAttachments(c.env.DB, id);
+    const atts = await getAttachments(c.env.DB, id, owner);
     const attachments = [];
     for (const a of atts) {
       const obj = await c.env.EMAIL_CACHE.get(a.r2_key);

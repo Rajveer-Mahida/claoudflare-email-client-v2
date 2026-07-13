@@ -1,6 +1,6 @@
-// Ported near-verbatim from the legacy project's lib/db.ts.
-// Only change: every function takes the D1Database explicitly (Hono passes c.env.DB)
-// instead of pulling it from getCloudflareContext().
+// Data-access layer. Every user-facing query is scoped by `owner` (Clerk userId).
+// Reads take `owner: string | null` — `null` means "all owners" (admin, unfiltered).
+// Writes take a concrete `owner: string`.
 
 import type {
   MessageRow,
@@ -13,14 +13,23 @@ import type {
   AliasRow,
   AliasWithCount,
   RuleRow,
+  AdminUserSummary,
 } from "@email/shared";
 
 type DB = D1Database;
+
+/** Owner is nullable for admin "all". */
+type Owner = string | null;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+/** `col = ?` predicate for a concrete owner, or `1=1` when unfiltered (admin). */
+function ownerPred(owner: Owner, col = "owner"): { sql: string; args: unknown[] } {
+  return owner === null ? { sql: "1=1", args: [] } : { sql: `${col} = ?`, args: [owner] };
 }
 
 function viewWhere(view: ViewName, now: number): { where: string; args: unknown[] } {
@@ -96,6 +105,7 @@ function parseSearch(q: string): SearchParsed {
 
 export async function listMessages(
   db: DB,
+  owner: Owner,
   opts: {
     limit?: number;
     offset?: number;
@@ -113,6 +123,12 @@ export async function listMessages(
   const joins: string[] = [];
   const whereParts: string[] = [];
   const whereArgs: unknown[] = [];
+
+  // Tenant scope first.
+  if (owner !== null) {
+    whereParts.push("m.owner = ?");
+    whereArgs.push(owner);
+  }
 
   // Scope: a label (across views) or the current view's predicate.
   if (opts.labelId) {
@@ -172,8 +188,9 @@ export async function listMessages(
   return res.results ?? [];
 }
 
-export async function getViewCounts(db: DB): Promise<ViewCounts> {
+export async function getViewCounts(db: DB, owner: Owner): Promise<ViewCounts> {
   const now = Date.now();
+  const o = ownerPred(owner);
   const row = await db
     .prepare(
       `SELECT
@@ -184,44 +201,61 @@ export async function getViewCounts(db: DB): Promise<ViewCounts> {
         SUM(CASE WHEN is_archived=1 AND is_deleted=0 THEN 1 ELSE 0 END) as archived,
         SUM(CASE WHEN is_deleted=1 THEN 1 ELSE 0 END) as trash,
         SUM(CASE WHEN direction='out' AND (send_state IS NULL OR send_state IN ('sent','pending')) THEN 1 ELSE 0 END) as sent
-      FROM messages`,
+      FROM messages WHERE ${o.sql}`,
     )
-    .bind(now, now, now)
+    .bind(now, now, now, ...o.args)
     .first<ViewCounts>();
   return row ?? { inbox: 0, unread: 0, starred: 0, snoozed: 0, archived: 0, trash: 0, sent: 0 };
 }
 
-export async function getLabelCounts(db: DB): Promise<LabelCount[]> {
+export async function getLabelCounts(db: DB, owner: Owner): Promise<LabelCount[]> {
+  const o = ownerPred(owner, "l.owner");
   const res = await db
     .prepare(
-      `SELECT l.id, l.name, l.color, l.created_at, COUNT(ml.message_id) as count
+      `SELECT l.id, l.owner, l.name, l.color, l.created_at, COUNT(ml.message_id) as count
        FROM labels l
        LEFT JOIN message_labels ml ON ml.label_id = l.id
        LEFT JOIN messages m ON m.id = ml.message_id AND m.is_deleted = 0
+       WHERE ${o.sql}
        GROUP BY l.id
        ORDER BY l.name ASC`,
     )
+    .bind(...o.args)
     .all<LabelCount>();
   return res.results ?? [];
 }
 
-export async function getMessage(db: DB, id: string): Promise<MessageRow | null> {
-  const res = await db.prepare(`SELECT * FROM messages WHERE id = ?`).bind(id).first<MessageRow>();
+export async function getMessage(db: DB, id: string, owner: Owner): Promise<MessageRow | null> {
+  const o = ownerPred(owner);
+  const res = await db
+    .prepare(`SELECT * FROM messages WHERE id = ? AND ${o.sql}`)
+    .bind(id, ...o.args)
+    .first<MessageRow>();
   return res ?? null;
 }
 
-export async function getThread(db: DB, threadId: string): Promise<MessageRow[]> {
+export async function getThread(db: DB, threadId: string, owner: Owner): Promise<MessageRow[]> {
+  const o = ownerPred(owner);
   const res = await db
-    .prepare(`SELECT * FROM messages WHERE thread_id = ? ORDER BY received_at ASC`)
-    .bind(threadId)
+    .prepare(`SELECT * FROM messages WHERE thread_id = ? AND ${o.sql} ORDER BY received_at ASC`)
+    .bind(threadId, ...o.args)
     .all<MessageRow>();
   return res.results ?? [];
 }
 
-export async function getAttachments(db: DB, messageId: string): Promise<AttachmentRow[]> {
+// Attachments carry no owner column; they are scoped via their parent message.
+export async function getAttachments(
+  db: DB,
+  messageId: string,
+  owner: Owner,
+): Promise<AttachmentRow[]> {
+  const o = ownerPred(owner, "m.owner");
   const res = await db
-    .prepare(`SELECT * FROM attachments WHERE message_id = ?`)
-    .bind(messageId)
+    .prepare(
+      `SELECT a.* FROM attachments a JOIN messages m ON m.id = a.message_id
+       WHERE a.message_id = ? AND ${o.sql}`,
+    )
+    .bind(messageId, ...o.args)
     .all<AttachmentRow>();
   return res.results ?? [];
 }
@@ -229,13 +263,18 @@ export async function getAttachments(db: DB, messageId: string): Promise<Attachm
 export async function attachmentsForMessages(
   db: DB,
   ids: string[],
+  owner: Owner,
 ): Promise<Record<string, AttachmentRow[]>> {
   const map: Record<string, AttachmentRow[]> = {};
   if (!ids.length) return map;
   const ph = ids.map(() => "?").join(",");
+  const o = ownerPred(owner, "m.owner");
   const res = await db
-    .prepare(`SELECT * FROM attachments WHERE message_id IN (${ph})`)
-    .bind(...ids)
+    .prepare(
+      `SELECT a.* FROM attachments a JOIN messages m ON m.id = a.message_id
+       WHERE a.message_id IN (${ph}) AND ${o.sql}`,
+    )
+    .bind(...ids, ...o.args)
     .all<AttachmentRow>();
   for (const a of res.results ?? []) {
     (map[a.message_id] ??= []).push(a);
@@ -247,49 +286,71 @@ export async function getAttachmentByCid(
   db: DB,
   messageId: string,
   contentId: string,
+  owner: Owner,
 ): Promise<AttachmentRow | null> {
+  const o = ownerPred(owner, "m.owner");
   const res = await db
-    .prepare(`SELECT * FROM attachments WHERE message_id = ? AND content_id = ?`)
-    .bind(messageId, contentId)
+    .prepare(
+      `SELECT a.* FROM attachments a JOIN messages m ON m.id = a.message_id
+       WHERE a.message_id = ? AND a.content_id = ? AND ${o.sql}`,
+    )
+    .bind(messageId, contentId, ...o.args)
     .first<AttachmentRow>();
   return res ?? null;
 }
 
-export async function markRead(db: DB, id: string, read = true): Promise<void> {
-  await db.prepare(`UPDATE messages SET is_read = ? WHERE id = ?`).bind(read ? 1 : 0, id).run();
+export async function markRead(db: DB, id: string, read: boolean, owner: Owner): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`UPDATE messages SET is_read = ? WHERE id = ? AND ${o.sql}`)
+    .bind(read ? 1 : 0, id, ...o.args)
+    .run();
 }
 
-export async function softDelete(db: DB, id: string): Promise<void> {
-  await db.prepare(`UPDATE messages SET is_deleted = 1 WHERE id = ?`).bind(id).run();
+export async function softDelete(db: DB, id: string, owner: Owner): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`UPDATE messages SET is_deleted = 1 WHERE id = ? AND ${o.sql}`)
+    .bind(id, ...o.args)
+    .run();
 }
 
-export async function permanentDeleteMessages(db: DB, ids: string[]): Promise<void> {
+export async function permanentDeleteMessages(db: DB, ids: string[], owner: Owner): Promise<void> {
   if (!ids.length) return;
+  const o = ownerPred(owner);
   for (const c of chunk(ids, 100)) {
     const ph = c.map(() => "?").join(",");
-    await db.prepare(`DELETE FROM messages WHERE id IN (${ph})`).bind(...c).run();
+    await db
+      .prepare(`DELETE FROM messages WHERE id IN (${ph}) AND ${o.sql}`)
+      .bind(...c, ...o.args)
+      .run();
   }
 }
 
 export async function markAllRead(
   db: DB,
+  owner: Owner,
   opts: { view: ViewName; labelId?: string },
 ): Promise<void> {
   const now = Date.now();
+  const o = ownerPred(owner);
   if (opts.labelId) {
     await db
       .prepare(
-        `UPDATE messages SET is_read = 1 WHERE is_read = 0 AND id IN (
+        `UPDATE messages SET is_read = 1 WHERE is_read = 0 AND ${o.sql} AND id IN (
           SELECT m.id FROM messages m JOIN message_labels ml ON ml.message_id = m.id
           WHERE ml.label_id = ? AND m.is_deleted = 0
         )`,
       )
-      .bind(opts.labelId)
+      .bind(...o.args, opts.labelId)
       .run();
     return;
   }
   const { where, args } = viewWhere(opts.view, now);
-  await db.prepare(`UPDATE messages SET is_read = 1 WHERE is_read = 0 AND ${where}`).bind(...args).run();
+  await db
+    .prepare(`UPDATE messages SET is_read = 1 WHERE is_read = 0 AND ${o.sql} AND ${where}`)
+    .bind(...o.args, ...args)
+    .run();
 }
 
 export async function setFlag(
@@ -297,46 +358,91 @@ export async function setFlag(
   ids: string[],
   field: "is_starred" | "is_archived" | "is_deleted" | "is_read",
   value: 0 | 1,
+  owner: Owner,
 ): Promise<void> {
   if (!ids.length) return;
+  const o = ownerPred(owner);
   for (const c of chunk(ids, 100)) {
     const ph = c.map(() => "?").join(",");
-    await db.prepare(`UPDATE messages SET ${field} = ? WHERE id IN (${ph})`).bind(value, ...c).run();
+    await db
+      .prepare(`UPDATE messages SET ${field} = ? WHERE id IN (${ph}) AND ${o.sql}`)
+      .bind(value, ...c, ...o.args)
+      .run();
   }
 }
 
-export async function setSnooze(db: DB, ids: string[], until: number | null): Promise<void> {
+export async function setSnooze(
+  db: DB,
+  ids: string[],
+  until: number | null,
+  owner: Owner,
+): Promise<void> {
   if (!ids.length) return;
+  const o = ownerPred(owner);
   for (const c of chunk(ids, 100)) {
     const ph = c.map(() => "?").join(",");
-    await db.prepare(`UPDATE messages SET snooze_until = ? WHERE id IN (${ph})`).bind(until, ...c).run();
+    await db
+      .prepare(`UPDATE messages SET snooze_until = ? WHERE id IN (${ph}) AND ${o.sql}`)
+      .bind(until, ...c, ...o.args)
+      .run();
   }
 }
 
 // ── Labels ──────────────────────────────────────────────────────────────────
 
-export async function listLabels(db: DB): Promise<LabelRow[]> {
-  const res = await db.prepare(`SELECT * FROM labels ORDER BY name ASC`).all<LabelRow>();
+export async function listLabels(db: DB, owner: Owner): Promise<LabelRow[]> {
+  const o = ownerPred(owner);
+  const res = await db
+    .prepare(`SELECT * FROM labels WHERE ${o.sql} ORDER BY name ASC`)
+    .bind(...o.args)
+    .all<LabelRow>();
   return res.results ?? [];
 }
 
-export async function createLabel(db: DB, name: string, color: string): Promise<LabelRow> {
+export async function createLabel(
+  db: DB,
+  owner: string,
+  name: string,
+  color: string,
+): Promise<LabelRow> {
   const id = crypto.randomUUID();
   const created_at = Date.now();
   await db
-    .prepare(`INSERT INTO labels (id, name, color, created_at) VALUES (?,?,?,?)`)
-    .bind(id, name, color, created_at)
+    .prepare(`INSERT INTO labels (id, owner, name, color, created_at) VALUES (?,?,?,?,?)`)
+    .bind(id, owner, name, color, created_at)
     .run();
-  return { id, name, color, created_at };
+  return { id, owner, name, color, created_at };
 }
 
-export async function deleteLabel(db: DB, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM labels WHERE id = ?`).bind(id).run();
+export async function deleteLabel(db: DB, id: string, owner: Owner): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`DELETE FROM labels WHERE id = ? AND ${o.sql}`)
+    .bind(id, ...o.args)
+    .run();
+  // Also drop the join rows for this label.
+  await db.prepare(`DELETE FROM message_labels WHERE label_id = ?`).bind(id).run();
 }
 
-export async function applyLabels(db: DB, messageIds: string[], labelIds: string[]): Promise<void> {
+// Both the message and the label must belong to `owner`, else the pairing is skipped.
+export async function applyLabels(
+  db: DB,
+  owner: string,
+  messageIds: string[],
+  labelIds: string[],
+): Promise<void> {
   for (const mid of messageIds) {
+    const okMsg = await db
+      .prepare(`SELECT 1 FROM messages WHERE id = ? AND owner = ?`)
+      .bind(mid, owner)
+      .first();
+    if (!okMsg) continue;
     for (const lid of labelIds) {
+      const okLabel = await db
+        .prepare(`SELECT 1 FROM labels WHERE id = ? AND owner = ?`)
+        .bind(lid, owner)
+        .first();
+      if (!okLabel) continue;
       await db
         .prepare(`INSERT OR IGNORE INTO message_labels (message_id, label_id) VALUES (?,?)`)
         .bind(mid, lid)
@@ -345,31 +451,47 @@ export async function applyLabels(db: DB, messageIds: string[], labelIds: string
   }
 }
 
-export async function removeLabel(db: DB, messageId: string, labelId: string): Promise<void> {
+export async function removeLabel(
+  db: DB,
+  owner: string,
+  messageId: string,
+  labelId: string,
+): Promise<void> {
   await db
-    .prepare(`DELETE FROM message_labels WHERE message_id = ? AND label_id = ?`)
-    .bind(messageId, labelId)
+    .prepare(
+      `DELETE FROM message_labels WHERE message_id = ? AND label_id = ?
+       AND EXISTS (SELECT 1 FROM messages WHERE id = ? AND owner = ?)`,
+    )
+    .bind(messageId, labelId, messageId, owner)
     .run();
 }
 
 export async function labelsForMessages(
   db: DB,
   ids: string[],
+  owner: Owner,
 ): Promise<Map<string, LabelRow[]>> {
   if (!ids.length) return new Map();
   const ph = ids.map(() => "?").join(",");
+  const o = ownerPred(owner, "l.owner");
   const res = await db
     .prepare(
-      `SELECT ml.message_id, l.id, l.name, l.color, l.created_at
+      `SELECT ml.message_id, l.id, l.owner, l.name, l.color, l.created_at
        FROM message_labels ml JOIN labels l ON l.id = ml.label_id
-       WHERE ml.message_id IN (${ph})`,
+       WHERE ml.message_id IN (${ph}) AND ${o.sql}`,
     )
-    .bind(...ids)
+    .bind(...ids, ...o.args)
     .all<{ message_id: string } & LabelRow>();
   const map = new Map<string, LabelRow[]>();
   for (const row of res.results ?? []) {
     const arr = map.get(row.message_id) ?? [];
-    arr.push({ id: row.id, name: row.name, color: row.color, created_at: row.created_at });
+    arr.push({
+      id: row.id,
+      owner: row.owner,
+      name: row.name,
+      color: row.color,
+      created_at: row.created_at,
+    });
     map.set(row.message_id, arr);
   }
   return map;
@@ -379,6 +501,7 @@ export async function labelsForMessages(
 
 export async function insertOutbound(
   db: DB,
+  owner: string,
   opts: {
     inReplyToMessageId: string;
     from: string;
@@ -394,20 +517,21 @@ export async function insertOutbound(
   const snippet = opts.text.replace(/\s+/g, " ").trim().slice(0, 200);
   const pending = opts.sendAfter !== undefined;
 
-  const parent = await getMessage(db, opts.inReplyToMessageId);
+  const parent = await getMessage(db, opts.inReplyToMessageId, owner);
   const threadId = parent?.thread_id ?? parent?.message_id ?? opts.inReplyToMessageId;
   const inReplyTo = parent?.message_id ?? null;
 
   await db
     .prepare(
       `INSERT INTO messages
-         (id, in_reply_to, thread_id, direction, from_addr, from_name,
+         (id, owner, in_reply_to, thread_id, direction, from_addr, from_name,
           to_addr, subject, snippet, html, text, raw_key, received_at, is_read,
           send_state, send_after)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     )
     .bind(
       id,
+      owner,
       inReplyTo,
       threadId,
       "out",
@@ -431,6 +555,7 @@ export async function insertOutbound(
  *  attachment rows. Returns the new message id. Pending if sendAfter is set. */
 export async function recordOutbound(
   db: DB,
+  owner: string,
   opts: {
     from: string;
     to: string;
@@ -452,7 +577,7 @@ export async function recordOutbound(
   let threadId: string = id;
   let inReplyTo: string | null = null;
   if (opts.inReplyToMessageId) {
-    const parent = await getMessage(db, opts.inReplyToMessageId);
+    const parent = await getMessage(db, opts.inReplyToMessageId, owner);
     threadId = parent?.thread_id ?? parent?.message_id ?? opts.inReplyToMessageId;
     inReplyTo = parent?.message_id ?? null;
   }
@@ -460,13 +585,14 @@ export async function recordOutbound(
   await db
     .prepare(
       `INSERT INTO messages
-         (id, in_reply_to, thread_id, direction, from_addr, from_name,
+         (id, owner, in_reply_to, thread_id, direction, from_addr, from_name,
           to_addr, cc, bcc, subject, snippet, html, text, raw_key, received_at,
           is_read, send_state, send_after)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     )
     .bind(
       id,
+      owner,
       inReplyTo,
       threadId,
       "out",
@@ -500,17 +626,28 @@ export async function recordOutbound(
 
 // ── Drafts ───────────────────────────────────────────────────────────────────
 
-export async function listDrafts(db: DB): Promise<DraftRow[]> {
-  const res = await db.prepare(`SELECT * FROM drafts ORDER BY updated_at DESC`).all<DraftRow>();
+export async function listDrafts(db: DB, owner: Owner): Promise<DraftRow[]> {
+  const o = ownerPred(owner);
+  const res = await db
+    .prepare(`SELECT * FROM drafts WHERE ${o.sql} ORDER BY updated_at DESC`)
+    .bind(...o.args)
+    .all<DraftRow>();
   return res.results ?? [];
 }
 
-export async function getDraft(db: DB, id: string): Promise<DraftRow | null> {
-  return (await db.prepare(`SELECT * FROM drafts WHERE id = ?`).bind(id).first<DraftRow>()) ?? null;
+export async function getDraft(db: DB, id: string, owner: Owner): Promise<DraftRow | null> {
+  const o = ownerPred(owner);
+  return (
+    (await db
+      .prepare(`SELECT * FROM drafts WHERE id = ? AND ${o.sql}`)
+      .bind(id, ...o.args)
+      .first<DraftRow>()) ?? null
+  );
 }
 
 export async function upsertDraft(
   db: DB,
+  owner: string,
   d: {
     id?: string;
     to_addr: string;
@@ -527,15 +664,17 @@ export async function upsertDraft(
   const updated_at = Date.now();
   await db
     .prepare(
-      `INSERT INTO drafts (id, to_addr, cc, bcc, subject, text, html, in_reply_to_id, attachments, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)
+      `INSERT INTO drafts (id, owner, to_addr, cc, bcc, subject, text, html, in_reply_to_id, attachments, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          to_addr=excluded.to_addr, cc=excluded.cc, bcc=excluded.bcc, subject=excluded.subject,
          text=excluded.text, html=excluded.html, in_reply_to_id=excluded.in_reply_to_id,
-         attachments=excluded.attachments, updated_at=excluded.updated_at`,
+         attachments=excluded.attachments, updated_at=excluded.updated_at
+       WHERE drafts.owner = excluded.owner`,
     )
     .bind(
       id,
+      owner,
       d.to_addr,
       d.cc ?? null,
       d.bcc ?? null,
@@ -549,6 +688,7 @@ export async function upsertDraft(
     .run();
   return {
     id,
+    owner,
     to_addr: d.to_addr,
     cc: d.cc ?? null,
     bcc: d.bcc ?? null,
@@ -561,28 +701,39 @@ export async function upsertDraft(
   };
 }
 
-export async function deleteDraft(db: DB, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM drafts WHERE id = ?`).bind(id).run();
+export async function deleteDraft(db: DB, id: string, owner: Owner): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`DELETE FROM drafts WHERE id = ? AND ${o.sql}`)
+    .bind(id, ...o.args)
+    .run();
 }
 
-export async function draftCount(db: DB): Promise<number> {
-  const r = await db.prepare(`SELECT COUNT(*) AS n FROM drafts`).first<{ n: number }>();
+export async function draftCount(db: DB, owner: Owner): Promise<number> {
+  const o = ownerPred(owner);
+  const r = await db
+    .prepare(`SELECT COUNT(*) AS n FROM drafts WHERE ${o.sql}`)
+    .bind(...o.args)
+    .first<{ n: number }>();
   return r?.n ?? 0;
 }
 
 // ── Aliases ──────────────────────────────────────────────────────────────────
 
-export async function listAliases(db: DB): Promise<AliasWithCount[]> {
+export async function listAliases(db: DB, owner: Owner): Promise<AliasWithCount[]> {
+  const o = ownerPred(owner, "a.owner");
   const res = await db
     .prepare(
-      `SELECT a.address, a.name, a.note, a.disabled, a.created_at,
+      `SELECT a.address, a.owner, a.name, a.note, a.disabled, a.created_at,
               COUNT(m.id) AS mail_count,
               SUM(CASE WHEN m.is_read = 0 AND m.direction = 'in' THEN 1 ELSE 0 END) AS unread_count
        FROM aliases a
        LEFT JOIN messages m ON m.to_addr = a.address AND m.is_deleted = 0 AND m.direction = 'in'
+       WHERE ${o.sql}
        GROUP BY a.address
        ORDER BY a.created_at DESC`,
     )
+    .bind(...o.args)
     .all<AliasWithCount>();
   return (res.results ?? []).map((r) => ({
     ...r,
@@ -591,30 +742,42 @@ export async function listAliases(db: DB): Promise<AliasWithCount[]> {
   }));
 }
 
+/** Owner of an alias (by address), or null if the address is unclaimed. */
+export async function getAliasOwner(db: DB, address: string): Promise<string | null> {
+  const r = await db
+    .prepare(`SELECT owner FROM aliases WHERE address = ?`)
+    .bind(address)
+    .first<{ owner: string }>();
+  return r?.owner ?? null;
+}
+
+/**
+ * Create an alias owned by `owner`. Addresses are globally unique across users;
+ * returns null if the address already exists and is owned by someone else.
+ */
 export async function createAlias(
   db: DB,
+  owner: string,
   address: string,
   name: string | null,
   note: string | null,
-): Promise<AliasRow> {
+): Promise<AliasRow | null> {
+  const existingOwner = await getAliasOwner(db, address);
+  if (existingOwner !== null && existingOwner !== owner) return null;
   const created_at = Date.now();
   await db
     .prepare(
-      `INSERT INTO aliases (address, name, note, disabled, created_at) VALUES (?,?,?,0,?)
+      `INSERT INTO aliases (address, owner, name, note, disabled, created_at) VALUES (?,?,?,?,0,?)
        ON CONFLICT(address) DO UPDATE SET name = COALESCE(excluded.name, aliases.name),
-                                          note = COALESCE(excluded.note, aliases.note)`,
+                                          note = COALESCE(excluded.note, aliases.note)
+       WHERE aliases.owner = excluded.owner`,
     )
-    .bind(address, name, note, created_at)
+    .bind(address, owner, name, note, created_at)
     .run();
-  return (await db.prepare(`SELECT * FROM aliases WHERE address = ?`).bind(address).first<AliasRow>())!;
-}
-
-/** Auto-track an alias on first inbound (no-op if it already exists). */
-export async function registerAlias(db: DB, address: string): Promise<void> {
-  await db
-    .prepare(`INSERT OR IGNORE INTO aliases (address, disabled, created_at) VALUES (?,0,?)`)
-    .bind(address, Date.now())
-    .run();
+  return (
+    (await db.prepare(`SELECT * FROM aliases WHERE address = ?`).bind(address).first<AliasRow>()) ??
+    null
+  );
 }
 
 export async function isAliasDisabled(db: DB, address: string): Promise<boolean> {
@@ -627,6 +790,7 @@ export async function isAliasDisabled(db: DB, address: string): Promise<boolean>
 
 export async function updateAlias(
   db: DB,
+  owner: Owner,
   address: string,
   fields: { name?: string | null; note?: string | null; disabled?: 0 | 1 },
 ): Promise<void> {
@@ -645,43 +809,69 @@ export async function updateAlias(
     args.push(fields.disabled);
   }
   if (!sets.length) return;
+  const o = ownerPred(owner);
   args.push(address);
-  await db.prepare(`UPDATE aliases SET ${sets.join(", ")} WHERE address = ?`).bind(...args).run();
+  await db
+    .prepare(`UPDATE aliases SET ${sets.join(", ")} WHERE address = ? AND ${o.sql}`)
+    .bind(...args, ...o.args)
+    .run();
 }
 
-export async function deleteAlias(db: DB, address: string): Promise<void> {
-  await db.prepare(`DELETE FROM aliases WHERE address = ?`).bind(address).run();
+export async function deleteAlias(db: DB, owner: Owner, address: string): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`DELETE FROM aliases WHERE address = ? AND ${o.sql}`)
+    .bind(address, ...o.args)
+    .run();
 }
 
 // ── Filters / rules ──────────────────────────────────────────────────────────
 
-export async function listRules(db: DB): Promise<RuleRow[]> {
-  const res = await db.prepare(`SELECT * FROM rules ORDER BY created_at ASC`).all<RuleRow>();
+export async function listRules(db: DB, owner: Owner): Promise<RuleRow[]> {
+  const o = ownerPred(owner);
+  const res = await db
+    .prepare(`SELECT * FROM rules WHERE ${o.sql} ORDER BY created_at ASC`)
+    .bind(...o.args)
+    .all<RuleRow>();
   return res.results ?? [];
 }
 
 export async function createRule(
   db: DB,
+  owner: string,
   r: { field: string; op: string; value: string; action: string; action_value?: string | null },
 ): Promise<RuleRow> {
   const id = crypto.randomUUID();
   const created_at = Date.now();
   await db
     .prepare(
-      `INSERT INTO rules (id, field, op, value, action, action_value, enabled, created_at)
-       VALUES (?,?,?,?,?,?,1,?)`,
+      `INSERT INTO rules (id, owner, field, op, value, action, action_value, enabled, created_at)
+       VALUES (?,?,?,?,?,?,?,1,?)`,
     )
-    .bind(id, r.field, r.op, r.value, r.action, r.action_value ?? null, created_at)
+    .bind(id, owner, r.field, r.op, r.value, r.action, r.action_value ?? null, created_at)
     .run();
   return (await db.prepare(`SELECT * FROM rules WHERE id = ?`).bind(id).first<RuleRow>())!;
 }
 
-export async function updateRule(db: DB, id: string, enabled: 0 | 1): Promise<void> {
-  await db.prepare(`UPDATE rules SET enabled = ? WHERE id = ?`).bind(enabled, id).run();
+export async function updateRule(
+  db: DB,
+  owner: Owner,
+  id: string,
+  enabled: 0 | 1,
+): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`UPDATE rules SET enabled = ? WHERE id = ? AND ${o.sql}`)
+    .bind(enabled, id, ...o.args)
+    .run();
 }
 
-export async function deleteRule(db: DB, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM rules WHERE id = ?`).bind(id).run();
+export async function deleteRule(db: DB, owner: Owner, id: string): Promise<void> {
+  const o = ownerPred(owner);
+  await db
+    .prepare(`DELETE FROM rules WHERE id = ? AND ${o.sql}`)
+    .bind(id, ...o.args)
+    .run();
 }
 
 function ruleMatches(rule: RuleRow, msg: { from_addr: string; to_addr: string; subject: string }): boolean {
@@ -701,12 +891,15 @@ function ruleMatches(rule: RuleRow, msg: { from_addr: string; to_addr: string; s
   }
 }
 
-/** Apply all enabled rules to one message. Returns the actions taken. */
+/** Apply all of `owner`'s enabled rules to one of their messages. */
 export async function applyRules(
   db: DB,
+  owner: string,
   msg: { id: string; from_addr: string; to_addr: string; subject: string },
 ): Promise<void> {
-  const rules = (await db.prepare(`SELECT * FROM rules WHERE enabled = 1`).all<RuleRow>()).results ?? [];
+  const rules =
+    (await db.prepare(`SELECT * FROM rules WHERE enabled = 1 AND owner = ?`).bind(owner).all<RuleRow>())
+      .results ?? [];
   for (const rule of rules) {
     if (!ruleMatches(rule, msg)) continue;
     switch (rule.action) {
@@ -731,24 +924,32 @@ export async function applyRules(
   }
 }
 
-/** Re-run all rules over recent inbound mail. Returns how many messages matched. */
-export async function applyRulesToExisting(db: DB): Promise<number> {
+/** Re-run `owner`'s rules over their recent inbound mail. Returns how many matched. */
+export async function applyRulesToExisting(db: DB, owner: string): Promise<number> {
   const rows =
     (
       await db
         .prepare(
           `SELECT id, from_addr, to_addr, subject FROM messages
-           WHERE direction = 'in' AND is_deleted = 0 ORDER BY received_at DESC LIMIT 1000`,
+           WHERE direction = 'in' AND is_deleted = 0 AND owner = ? ORDER BY received_at DESC LIMIT 1000`,
         )
+        .bind(owner)
         .all<{ id: string; from_addr: string; to_addr: string; subject: string | null }>()
     ).results ?? [];
   let touched = 0;
   for (const m of rows) {
-    await applyRules(db, { id: m.id, from_addr: m.from_addr, to_addr: m.to_addr, subject: m.subject ?? "" });
+    await applyRules(db, owner, {
+      id: m.id,
+      from_addr: m.from_addr,
+      to_addr: m.to_addr,
+      subject: m.subject ?? "",
+    });
     touched++;
   }
   return touched;
 }
+
+// ── Undo-send state machine (system-level: operated by the cron + send flow) ──
 
 export async function claimPendingMessage(db: DB, id: string): Promise<boolean> {
   const res = await db
@@ -768,4 +969,45 @@ export async function cancelPendingMessage(db: DB, id: string): Promise<boolean>
     .bind(id)
     .run();
   return (res.meta?.changes ?? 0) > 0;
+}
+
+// ── Users / admin ─────────────────────────────────────────────────────────────
+
+export async function upsertUser(db: DB, id: string, email: string | null): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO users (id, email, created_at) VALUES (?,?,?)
+       ON CONFLICT(id) DO UPDATE SET email = excluded.email`,
+    )
+    .bind(id, email, Date.now())
+    .run();
+}
+
+export async function listUsersWithCounts(db: DB): Promise<AdminUserSummary[]> {
+  const res = await db
+    .prepare(
+      `SELECT u.id, u.email, u.created_at,
+              (SELECT COUNT(*) FROM aliases a WHERE a.owner = u.id) AS alias_count,
+              (SELECT COUNT(*) FROM messages m WHERE m.owner = u.id AND m.is_deleted = 0) AS mail_count,
+              (SELECT COUNT(*) FROM messages m WHERE m.owner = u.id AND m.is_deleted = 0
+                 AND m.direction = 'in' AND m.is_read = 0) AS unread_count
+       FROM users u
+       ORDER BY u.created_at DESC`,
+    )
+    .all<AdminUserSummary>();
+  return res.results ?? [];
+}
+
+export async function logAdminAudit(
+  db: DB,
+  adminId: string,
+  targetOwner: string | null,
+  action: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO admin_audit (id, admin_id, target_owner, action, created_at) VALUES (?,?,?,?,?)`,
+    )
+    .bind(crypto.randomUUID(), adminId, targetOwner, action, Date.now())
+    .run();
 }

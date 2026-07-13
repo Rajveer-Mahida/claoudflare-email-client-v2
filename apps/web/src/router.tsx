@@ -17,10 +17,10 @@ const named = <T extends Record<string, ComponentType<unknown>>>(
 ) => lazy(() => loader().then((m) => ({ default: m[key] })));
 
 const MailDetail = named(() => import("@/components/MailDetail"), "MailDetail");
-const LoginPage = named(() => import("@/components/LoginPage"), "LoginPage");
 const SettingsPage = named(() => import("@/components/SettingsPage"), "SettingsPage");
 const DraftsPage = named(() => import("@/components/DraftsPage"), "DraftsPage");
 const AliasesPage = named(() => import("@/components/AliasesPage"), "AliasesPage");
+const AdminPage = named(() => import("@/components/AdminPage"), "AdminPage");
 
 function Lazy({ children }: { children: React.ReactNode }) {
   return (
@@ -37,16 +37,6 @@ function Lazy({ children }: { children: React.ReactNode }) {
 }
 
 const rootRoute = createRootRoute({ component: () => <Outlet /> });
-
-const loginRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/login",
-  component: () => (
-    <Lazy>
-      <LoginPage />
-    </Lazy>
-  ),
-});
 
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -106,13 +96,23 @@ const aliasesRoute = createRoute({
   ),
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/admin",
+  component: () => (
+    <Lazy>
+      <AdminPage />
+    </Lazy>
+  ),
+});
+
 const routeTree = rootRoute.addChildren([
-  loginRoute,
   shellRoute.addChildren([
     mailLayoutRoute.addChildren([indexRoute, mailRoute]),
     settingsRoute,
     draftsRoute,
     aliasesRoute,
+    adminRoute,
   ]),
 ]);
 

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import type { HonoEnv, Env } from "./env";
-import { verifySessionToken, cookieName } from "./auth";
-import { accessEnabled, verifyAccessJwt, emailAllowed } from "./access";
+import { verifyClerkJwt } from "./clerk";
+import { upsertUser } from "./db";
 import { handleEmail } from "./email-handler";
 import { runScheduled } from "./scheduled";
 import { auth } from "./routes/auth";
+import { admin } from "./routes/admin";
 import { messages } from "./routes/messages";
 import { labels, counts } from "./routes/labels";
 import { settings } from "./routes/settings";
@@ -21,37 +22,31 @@ import { ai } from "./routes/ai";
 
 const app = new Hono<HonoEnv>();
 
-// Auth gate: everything under /api except the login endpoint requires a valid session.
-const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/health"]);
+// Auth gate: everything under /api except health requires a valid Clerk session JWT.
+const PUBLIC_PATHS = new Set(["/api/health"]);
 
 app.use("/api/*", async (c, next) => {
   if (PUBLIC_PATHS.has(c.req.path)) return next();
 
-  // Access mode: verify the Cloudflare Access JWT + allowlist (no password).
-  if (accessEnabled(c.env)) {
-    const token =
-      c.req.header("Cf-Access-Jwt-Assertion") || getCookie(c, "CF_Authorization");
-    const email = token ? await verifyAccessJwt(c.env, token) : null;
-    if (email && emailAllowed(c.env, email)) {
-      c.set("email", email);
-      return next();
-    }
-    return c.json({ error: "access denied" }, 401);
-  }
+  const bearer = c.req.header("Authorization");
+  const token =
+    (bearer?.startsWith("Bearer ") ? bearer.slice(7) : null) ||
+    getCookie(c, "__session");
+  const claims = token ? await verifyClerkJwt(c.env, token) : null;
+  if (!claims) return c.json({ error: "unauthorized" }, 401);
 
-  // Fallback (Access not configured / local dev): password session cookie.
-  const token = getCookie(c, cookieName());
-  if (token) {
-    try {
-      if (await verifySessionToken(c.env, token)) return next();
-    } catch {
-      // fall through to 401
-    }
-  }
-  return c.json({ error: "unauthorized" }, 401);
+  c.set("userId", claims.userId);
+  c.set("email", claims.email);
+  c.set("isAdmin", claims.role === "admin");
+
+  // Mirror the Clerk identity locally on first sight (best-effort).
+  c.executionCtx.waitUntil(upsertUser(c.env.DB, claims.userId, claims.email));
+
+  return next();
 });
 
 app.route("/api/auth", auth);
+app.route("/api/admin", admin);
 app.route("/api/messages", messages);
 app.route("/api/labels", labels);
 app.route("/api/counts", counts);

@@ -12,6 +12,8 @@ import type {
   AliasWithCount,
   AliasRow,
   RuleRow,
+  MeResponse,
+  AdminUserSummary,
 } from "@email/shared";
 
 export class ApiError extends Error {
@@ -22,11 +24,41 @@ export class ApiError extends Error {
   }
 }
 
+// Clerk loads clerk-js and exposes window.Clerk; pull the session JWT from it so
+// the API can be called from these plain (non-React) helpers.
+type ClerkGlobal = { session?: { getToken(): Promise<string | null> } };
+async function authToken(): Promise<string | null> {
+  const clerk = (window as unknown as { Clerk?: ClerkGlobal }).Clerk;
+  try {
+    return clerk?.session ? await clerk.session.getToken() : null;
+  } catch {
+    return null;
+  }
+}
+
+// Admin "act as" — when set, every request carries ?owner=<userId> so the API
+// scopes to that user (ignored server-side for non-admins).
+let actingOwner: string | null = null;
+export function setActingOwner(id: string | null): void {
+  actingOwner = id;
+}
+export function getActingOwner(): string | null {
+  return actingOwner;
+}
+function withOwner(path: string): string {
+  if (!actingOwner) return path;
+  return path + (path.includes("?") ? "&" : "?") + "owner=" + encodeURIComponent(actingOwner);
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const token = await authToken();
+  const headers: Record<string, string> = {};
+  if (init?.body) headers["content-type"] = "application/json";
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(withOwner(path), {
     credentials: "include",
-    headers: init?.body ? { "content-type": "application/json" } : undefined,
     ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
   if (res.status === 401) {
     throw new ApiError(401, "unauthorized");
@@ -48,10 +80,11 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 const body = (data: unknown) => ({ method: "POST", body: JSON.stringify(data) });
 
 export const api = {
-  // auth
-  me: () => req<{ ok: true; email?: string | null }>("/api/auth/me"),
-  login: (password: string) => req<{ ok: true }>("/api/auth/login", body({ password })),
-  logout: () => req<{ ok: true; logoutUrl?: string }>("/api/auth/logout", { method: "POST" }),
+  // auth (identity comes from Clerk; this reports the resolved user)
+  me: () => req<MeResponse>("/api/auth/me"),
+
+  // admin
+  adminUsers: () => req<AdminUserSummary[]>("/api/admin/users"),
 
   // reads
   counts: () => req<CountsResponse>("/api/counts"),
@@ -171,7 +204,13 @@ export const api = {
   uploadFile: async (file: File): Promise<UploadedAttachment> => {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/uploads", { method: "POST", body: fd, credentials: "include" });
+    const token = await authToken();
+    const res = await fetch(withOwner("/api/uploads"), {
+      method: "POST",
+      body: fd,
+      credentials: "include",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
     if (!res.ok) {
       let msg = res.statusText;
       try {

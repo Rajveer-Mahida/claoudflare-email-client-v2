@@ -11,6 +11,7 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@email/shared": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.4",

@@ -1,13 +1,14 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { listDrafts, getDraft, upsertDraft, deleteDraft } from "../db";
+import { effectiveOwner, writeOwner } from "../scope";
 
 export const drafts = new Hono<HonoEnv>();
 
-drafts.get("/", async (c) => c.json(await listDrafts(c.env.DB)));
+drafts.get("/", async (c) => c.json(await listDrafts(c.env.DB, effectiveOwner(c).owner)));
 
 drafts.get("/:id", async (c) => {
-  const d = await getDraft(c.env.DB, c.req.param("id"));
+  const d = await getDraft(c.env.DB, c.req.param("id"), effectiveOwner(c).owner);
   if (!d) return c.json({ error: "not found" }, 404);
   return c.json(d);
 });
@@ -28,11 +29,11 @@ drafts.post("/", async (c) => {
     }>()
     .catch(() => null);
   if (!b) return c.json({ error: "invalid json" }, 400);
-  const row = await upsertDraft(c.env.DB, { ...b, to_addr: b.to_addr ?? "" });
+  const row = await upsertDraft(c.env.DB, writeOwner(c), { ...b, to_addr: b.to_addr ?? "" });
   return c.json(row);
 });
 
 drafts.delete("/:id", async (c) => {
-  await deleteDraft(c.env.DB, c.req.param("id"));
+  await deleteDraft(c.env.DB, c.req.param("id"), effectiveOwner(c).owner);
   return c.json({ ok: true });
 });

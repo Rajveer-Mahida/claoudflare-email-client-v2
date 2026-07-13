@@ -1,4 +1,6 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useClerk } from "@clerk/clerk-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -19,6 +21,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   LogOut,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import type { ViewName } from "@email/shared";
@@ -64,8 +67,10 @@ export function Sidebar() {
     setMobileNav,
     openCompose,
   } = useUI();
+  const { signOut } = useClerk();
   const counts = useCounts();
   const settings = useSettings();
+  const me = useQuery({ queryKey: ["auth", "me"], queryFn: api.me, staleTime: 60_000 });
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onSettings = pathname === "/settings";
 
@@ -96,12 +101,7 @@ export function Sidebar() {
   }
 
   async function logout() {
-    const r = await api.logout();
-    if (r.logoutUrl) {
-      window.location.href = r.logoutUrl; // Cloudflare Access sign-out
-      return;
-    }
-    navigate({ to: "/login" });
+    await signOut();
   }
 
   return (
@@ -252,6 +252,18 @@ export function Sidebar() {
 
       {/* Footer (pinned) */}
       <div className="flex flex-col gap-0.5 border-t border-border pt-3">
+        {me.data?.isAdmin && (
+          <SideItem
+            active={pathname === "/admin"}
+            collapsed={collapsed}
+            icon={<ShieldCheck size={18} />}
+            label="Admin"
+            onClick={() => {
+              setMobileNav(false);
+              navigate({ to: "/admin" });
+            }}
+          />
+        )}
         <SideItem
           active={onSettings}
           collapsed={collapsed}

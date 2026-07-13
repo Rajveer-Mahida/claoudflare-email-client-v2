@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { getAttachmentByCid } from "../db";
+import { effectiveOwner } from "../scope";
 
 export const attachments = new Hono<HonoEnv>();
 
-const ALLOWED_PREFIXES = ["attachments/", "emails/"];
 const INLINE_EXT = ["png", "jpg", "jpeg", "gif", "webp", "pdf", "txt"];
 
 // GET /api/attachments/cid?mid=&cid=  → inline image referenced by Content-ID
@@ -13,7 +13,7 @@ attachments.get("/cid", async (c) => {
   const cid = c.req.query("cid");
   if (!mid || !cid) return c.json({ error: "mid and cid required" }, 400);
 
-  const att = await getAttachmentByCid(c.env.DB, mid, decodeURIComponent(cid));
+  const att = await getAttachmentByCid(c.env.DB, mid, decodeURIComponent(cid), effectiveOwner(c).owner);
   if (!att) return c.json({ error: "not found" }, 404);
 
   const obj = await c.env.EMAIL_CACHE.get(att.r2_key);
@@ -29,12 +29,19 @@ attachments.get("/cid", async (c) => {
   });
 });
 
-// GET /api/attachments/*  → raw object from R2 (attachments/ or emails/ only)
+// GET /api/attachments/*  → raw object from R2. Keys are owner-namespaced
+// (emails/<owner>/…, attachments/<owner>/…, uploads/<owner>/…), so a caller may
+// only read objects under their own prefix. Admins (owner=null) may read any.
 attachments.get("/*", async (c) => {
   const fullKey = c.req.path.replace(/^\/api\/attachments\//, "");
-  if (!ALLOWED_PREFIXES.some((p) => fullKey.startsWith(p))) {
-    return c.json({ error: "forbidden" }, 403);
-  }
+  const { owner } = effectiveOwner(c);
+  const allowed =
+    owner === null
+      ? ["attachments/", "emails/", "uploads/"].some((p) => fullKey.startsWith(p))
+      : [`emails/${owner}/`, `attachments/${owner}/`, `uploads/${owner}/`].some((p) =>
+          fullKey.startsWith(p),
+        );
+  if (!allowed) return c.json({ error: "forbidden" }, 403);
 
   const obj = await c.env.EMAIL_CACHE.get(fullKey);
   if (!obj) return c.json({ error: "not found" }, 404);

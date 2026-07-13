@@ -4,7 +4,7 @@
 
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
-import { registerAlias, isAliasDisabled, applyRules } from "./db";
+import { getAliasOwner, isAliasDisabled, applyRules } from "./db";
 import { notifyNewMail } from "./push";
 
 const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
@@ -28,20 +28,34 @@ export async function handleEmail(
     return;
   }
 
-  // Managed aliases: bounce mail to a disabled alias; auto-track new ones.
+  // Multi-tenant: an inbound is only accepted for an alias that a user has
+  // generated (which records its owner). Unknown/unclaimed aliases are not
+  // auto-created — bounce or fall back instead.
+  const owner = await getAliasOwner(env.DB, recipient);
+  if (!owner) {
+    if (env.FALLBACK_FORWARD_TO) {
+      console.log("Forwarding unclaimed-alias email to fallback:", recipient);
+      await message.forward(env.FALLBACK_FORWARD_TO);
+    } else {
+      console.log("Rejected (unclaimed alias):", recipient);
+      message.setReject("Address not allowed");
+    }
+    return;
+  }
+
+  // Bounce mail to a disabled alias.
   if (await isAliasDisabled(env.DB, recipient)) {
     console.log("Rejected (disabled alias):", recipient);
     message.setReject("Address not active");
     return;
   }
-  await registerAlias(env.DB, recipient);
 
   const raw = await new Response(message.raw).arrayBuffer();
   const parsed = await new PostalMime().parse(raw);
 
   const id = crypto.randomUUID();
   const ts = Date.now();
-  const rawKey = `emails/${ts}-${id}.eml`;
+  const rawKey = `emails/${owner}/${ts}-${id}.eml`;
 
   await env.EMAIL_CACHE.put(rawKey, raw, {
     httpMetadata: { contentType: "message/rfc822" },
@@ -55,13 +69,14 @@ export async function handleEmail(
 
   await env.DB.prepare(
     `INSERT INTO messages
-       (id, message_id, in_reply_to, thread_id, direction,
+       (id, owner, message_id, in_reply_to, thread_id, direction,
         from_addr, from_name, to_addr, subject, snippet,
         html, text, raw_key, size_bytes, received_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   )
     .bind(
       id,
+      owner,
       parsed.messageId ?? null,
       parsed.inReplyTo ?? null,
       threadId,
@@ -79,21 +94,21 @@ export async function handleEmail(
     )
     .run();
 
-  // Apply user filters (label / archive / mark-read / trash).
-  await applyRules(env.DB, {
+  // Apply the alias owner's filters (label / archive / mark-read / trash).
+  await applyRules(env.DB, owner, {
     id,
     from_addr: fromAddr,
     to_addr: recipient,
     subject: parsed.subject ?? "",
   });
 
-  // Fire a new-mail push (best-effort, doesn't block delivery).
-  ctx.waitUntil(notifyNewMail(env));
+  // Fire a new-mail push to the owner's devices (best-effort).
+  ctx.waitUntil(notifyNewMail(env, owner));
 
   for (const att of parsed.attachments ?? []) {
     const aid = crypto.randomUUID();
     const safeName = (att.filename ?? "file").replace(/[^A-Za-z0-9._-]+/g, "_");
-    const r2Key = `attachments/${aid}-${safeName}`;
+    const r2Key = `attachments/${owner}/${aid}-${safeName}`;
 
     let bytes: ArrayBuffer;
     if (typeof att.content === "string") {

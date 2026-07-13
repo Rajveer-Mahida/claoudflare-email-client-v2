@@ -49,9 +49,10 @@
     "FALLBACK_FORWARD_TO": "rajveermahida.dev@gmail.com",
     "VAPID_SUBJECT": "mailto:google@swisstrustlayer.ch",
     "VAPID_PUBLIC_KEY": "BK39lEZNlzqOZVBx_q2-IwCDXxsMhsv6i9f8hGYjbgIh3KrpUmuFrurLSn7w_bxcNL3sbFKlEtLMmq3Gu__uvo0",
-    "AI_MODEL": "claude-haiku-4-5"
+    "AI_MODEL": "claude-haiku-4-5",
+    // Clerk issuer (JWKS host). Dev: https://<slug>.clerk.accounts.dev · Prod: https://clerk.<domain>
+    "CLERK_ISSUER": "https://curious-anchovy-5.clerk.accounts.dev"
   }
   // Secrets: VAPID_PRIVATE_JWK (push JWT signing), ANTHROPIC_API_KEY (AI features)
-
-  // Secrets (set via `wrangler secret put`): AUTH_SECRET, AUTH_PASSWORD
+  // Auth is Clerk (session-JWT verified against CLERK_ISSUER JWKS); no worker auth secrets.
 }

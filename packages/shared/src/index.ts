@@ -7,6 +7,7 @@ export type SendState = "pending" | "sending" | "sent" | "cancelled" | null;
 
 export type MessageRow = {
   id: string;
+  owner: string;
   message_id: string | null;
   in_reply_to: string | null;
   thread_id: string | null;
@@ -44,6 +45,7 @@ export type AttachmentRow = {
 
 export type LabelRow = {
   id: string;
+  owner: string;
   name: string;
   color: string;
   created_at: number;
@@ -123,6 +125,7 @@ export type ComposeRequest = {
 
 export type DraftRow = {
   id: string;
+  owner: string;
   to_addr: string; // comma-joined
   cc: string | null;
   bcc: string | null;
@@ -140,6 +143,7 @@ export type SignatureResponse = { signature: string };
 
 export type AliasRow = {
   address: string;
+  owner: string;
   name: string | null;
   note: string | null;
   disabled: number;
@@ -159,6 +163,7 @@ export type RuleAction = "label" | "archive" | "read" | "trash";
 
 export type RuleRow = {
   id: string;
+  owner: string;
   field: RuleField;
   op: RuleOp;
   value: string;
@@ -166,4 +171,26 @@ export type RuleRow = {
   action_value: string | null; // label_id when action === "label"
   enabled: number;
   created_at: number;
+};
+
+// ── Users / auth ─────────────────────────────────────────────────────────────
+
+export type UserRow = {
+  id: string; // Clerk userId
+  email: string | null;
+  created_at: number;
+};
+
+/** Current signed-in identity, returned by GET /api/auth/me. */
+export type MeResponse = {
+  userId: string;
+  email: string | null;
+  isAdmin: boolean;
+};
+
+/** Admin dashboard row: a user plus rollup usage counts. */
+export type AdminUserSummary = UserRow & {
+  alias_count: number;
+  mail_count: number;
+  unread_count: number;
 };

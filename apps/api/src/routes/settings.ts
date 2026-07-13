@@ -11,6 +11,7 @@ import {
   getSetting,
   setSetting,
 } from "../settings";
+import { writeOwner } from "../scope";
 
 export const settings = new Hono<HonoEnv>();
 
@@ -24,15 +25,16 @@ function parseAllowlist(raw: string | null): string[] {
 }
 
 settings.get("/", async (c) => {
-  const blockRaw = await getSetting(c.env.DB, "block_remote_images");
+  const owner = writeOwner(c);
+  const blockRaw = await getSetting(c.env.DB, owner, "block_remote_images");
   return c.json({
-    reply_enabled: await getReplyEnabled(c.env.DB),
-    compose_enabled: await getComposeEnabled(c.env.DB),
-    primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env),
+    reply_enabled: await getReplyEnabled(c.env.DB, owner),
+    compose_enabled: await getComposeEnabled(c.env.DB, owner),
+    primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env, owner),
     alias_domains: aliasDomains(c.env),
-    signature: (await getSetting(c.env.DB, "signature")) ?? "",
+    signature: (await getSetting(c.env.DB, owner, "signature")) ?? "",
     block_remote_images: blockRaw === null ? true : blockRaw === "1",
-    image_allowlist: parseAllowlist(await getSetting(c.env.DB, "image_allowlist")),
+    image_allowlist: parseAllowlist(await getSetting(c.env.DB, owner, "image_allowlist")),
   });
 });
 
@@ -47,33 +49,34 @@ settings.post("/", async (c) => {
       allow_image_sender?: string;
     }>()
     .catch(() => ({}) as Record<string, never>);
+  const owner = writeOwner(c);
 
   if (typeof body.compose_enabled === "boolean") {
-    await setComposeEnabled(c.env.DB, body.compose_enabled);
+    await setComposeEnabled(c.env.DB, owner, body.compose_enabled);
     return c.json({ ok: true, compose_enabled: body.compose_enabled });
   }
 
   if (typeof body.block_remote_images === "boolean") {
-    await setSetting(c.env.DB, "block_remote_images", body.block_remote_images ? "1" : "0");
+    await setSetting(c.env.DB, owner, "block_remote_images", body.block_remote_images ? "1" : "0");
     return c.json({ ok: true });
   }
 
   if (typeof body.allow_image_sender === "string" && body.allow_image_sender.trim()) {
-    const list = parseAllowlist(await getSetting(c.env.DB, "image_allowlist"));
+    const list = parseAllowlist(await getSetting(c.env.DB, owner, "image_allowlist"));
     const addr = body.allow_image_sender.trim().toLowerCase();
     if (!list.includes(addr)) list.push(addr);
-    await setSetting(c.env.DB, "image_allowlist", JSON.stringify(list));
+    await setSetting(c.env.DB, owner, "image_allowlist", JSON.stringify(list));
     return c.json({ ok: true });
   }
 
   if (typeof body.signature === "string") {
-    await setSetting(c.env.DB, "signature", body.signature);
+    await setSetting(c.env.DB, owner, "signature", body.signature);
     return c.json({ ok: true });
   }
 
   if (typeof body.primary_alias_domain === "string") {
     try {
-      await setPrimaryAliasDomain(c.env.DB, c.env, body.primary_alias_domain);
+      await setPrimaryAliasDomain(c.env.DB, c.env, owner, body.primary_alias_domain);
     } catch (err) {
       return c.json({ error: (err as Error)?.message ?? "Invalid domain" }, 400);
     }
@@ -81,7 +84,7 @@ settings.post("/", async (c) => {
   }
 
   if (typeof body.reply_enabled === "boolean") {
-    await setReplyEnabled(c.env.DB, body.reply_enabled);
+    await setReplyEnabled(c.env.DB, owner, body.reply_enabled);
     return c.json({ ok: true, reply_enabled: body.reply_enabled });
   }
 

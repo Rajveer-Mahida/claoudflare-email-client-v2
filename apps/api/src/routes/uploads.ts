@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import type { UploadedAttachment } from "@email/shared";
+import { writeOwner } from "../scope";
 
 export const uploads = new Hono<HonoEnv>();
 
@@ -22,7 +23,7 @@ uploads.post("/", async (c) => {
   if (file.size > MAX_BYTES) return c.json({ error: "file too large (max 24 MiB)" }, 413);
 
   const safeName = (file.name || "file").replace(/[^A-Za-z0-9._-]+/g, "_");
-  const key = `uploads/${crypto.randomUUID()}-${safeName}`;
+  const key = `uploads/${writeOwner(c)}/${crypto.randomUUID()}-${safeName}`;
   const mime = file.type || "application/octet-stream";
 
   await c.env.EMAIL_CACHE.put(key, await file.arrayBuffer(), {

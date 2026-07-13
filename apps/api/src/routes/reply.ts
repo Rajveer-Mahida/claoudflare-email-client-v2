@@ -2,11 +2,13 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { insertOutbound, getMessage } from "../db";
 import { getReplyEnabled } from "../settings";
+import { writeOwner } from "../scope";
 
 export const reply = new Hono<HonoEnv>();
 
 reply.post("/", async (c) => {
-  if (!(await getReplyEnabled(c.env.DB))) {
+  const owner = writeOwner(c);
+  if (!(await getReplyEnabled(c.env.DB, owner))) {
     return c.json({ error: "Replies disabled in settings" }, 403);
   }
 
@@ -28,20 +30,17 @@ reply.post("/", async (c) => {
   }
 
   // Reply FROM the alias this thread belongs to — i.e. the alias that received
-  // the original mail (inbound `to_addr`) — not the generic REPLY_FROM address.
-  const parent = await getMessage(c.env.DB, String(messageId));
-  const aliasFrom = parent
-    ? parent.direction === "in"
-      ? parent.to_addr
-      : parent.from_addr
-    : null;
-  const from = aliasFrom || c.env.REPLY_FROM;
+  // the original mail (inbound `to_addr`). The parent is owner-scoped, so the
+  // sender can only reply from their own alias.
+  const parent = await getMessage(c.env.DB, String(messageId), owner);
+  if (!parent) return c.json({ error: "not found" }, 404);
+  const from = parent.direction === "in" ? parent.to_addr : parent.from_addr;
   if (!from) return c.json({ error: "no sender address available" }, 500);
 
   // Undo-send flow: persist as pending; the legacy email worker's cron sends it.
   if (sendAfter) {
     try {
-      const id = await insertOutbound(c.env.DB, {
+      const id = await insertOutbound(c.env.DB, owner, {
         inReplyToMessageId: String(messageId),
         from,
         to: String(to),
@@ -65,7 +64,7 @@ reply.post("/", async (c) => {
       text: text ? String(text) : undefined,
     });
 
-    const id = await insertOutbound(c.env.DB, {
+    const id = await insertOutbound(c.env.DB, owner, {
       inReplyToMessageId: String(messageId),
       from,
       to: String(to),

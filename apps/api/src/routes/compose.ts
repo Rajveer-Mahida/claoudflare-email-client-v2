@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import type { HonoEnv, Env, EmailAttachmentOut } from "../env";
 import type { ComposeRequest, UploadedAttachment } from "@email/shared";
-import { recordOutbound, getMessage, deleteDraft } from "../db";
+import { recordOutbound, getMessage, deleteDraft, getAliasOwner } from "../db";
 import { getComposeEnabled } from "../settings";
+import { writeOwner } from "../scope";
 
 export const compose = new Hono<HonoEnv>();
 
@@ -27,7 +28,8 @@ async function loadAttachments(
 
 // POST /api/send — new mail, reply-all, or forward (universal sender).
 compose.post("/", async (c) => {
-  if (!(await getComposeEnabled(c.env.DB))) {
+  const owner = writeOwner(c);
+  if (!(await getComposeEnabled(c.env.DB, owner))) {
     return c.json({ error: "Compose disabled in settings" }, 403);
   }
 
@@ -40,14 +42,17 @@ compose.post("/", async (c) => {
   if (!to.length) return c.json({ error: "At least one recipient required" }, 400);
   if (!body.subject?.trim()) return c.json({ error: "Subject required" }, 400);
 
-  // Sender: explicit, else the thread's alias (reply/forward), else REPLY_FROM.
-  let from = body.from?.trim() || "";
+  // Sender: explicit, else the thread's alias (reply/forward). Must be an alias
+  // owned by the caller — no shared/system fallback in multi-tenant mode.
+  let from = body.from?.trim().toLowerCase() || "";
   if (!from && body.inReplyToMessageId) {
-    const parent = await getMessage(c.env.DB, body.inReplyToMessageId);
+    const parent = await getMessage(c.env.DB, body.inReplyToMessageId, owner);
     if (parent) from = parent.direction === "in" ? parent.to_addr : parent.from_addr;
   }
-  from = from || c.env.REPLY_FROM;
-  if (!from) return c.json({ error: "No sender address" }, 500);
+  if (!from) return c.json({ error: "Sender alias required" }, 400);
+  if ((await getAliasOwner(c.env.DB, from)) !== owner) {
+    return c.json({ error: "You can only send from your own alias" }, 403);
+  }
 
   const attachments = body.attachments ?? [];
   const ccStr = cc.length ? cc.join(", ") : null;
@@ -55,7 +60,7 @@ compose.post("/", async (c) => {
 
   // Scheduled send → store pending; the cron sends it later (with attachments/cc).
   if (body.sendAfter) {
-    const id = await recordOutbound(c.env.DB, {
+    const id = await recordOutbound(c.env.DB, owner, {
       from,
       to: to.join(", "),
       cc: ccStr,
@@ -72,7 +77,7 @@ compose.post("/", async (c) => {
         size_bytes: a.size_bytes,
       })),
     });
-    if (body.draftId) await deleteDraft(c.env.DB, body.draftId);
+    if (body.draftId) await deleteDraft(c.env.DB, body.draftId, owner);
     return c.json({ ok: true, id, pending: true });
   }
 
@@ -88,7 +93,7 @@ compose.post("/", async (c) => {
       attachments: attachments.length ? await loadAttachments(c.env, attachments) : undefined,
     });
 
-    const id = await recordOutbound(c.env.DB, {
+    const id = await recordOutbound(c.env.DB, owner, {
       from,
       to: to.join(", "),
       cc: ccStr,
@@ -104,7 +109,7 @@ compose.post("/", async (c) => {
         size_bytes: a.size_bytes,
       })),
     });
-    if (body.draftId) await deleteDraft(c.env.DB, body.draftId);
+    if (body.draftId) await deleteDraft(c.env.DB, body.draftId, owner);
     return c.json({ ok: true, id });
   } catch (err) {
     console.error("send failed", err);

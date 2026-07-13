@@ -12,10 +12,10 @@ push.post("/subscribe", async (c) => {
     .catch(() => ({}) as Record<string, never>);
   if (!b.endpoint) return c.json({ error: "endpoint required" }, 400);
   await c.env.DB.prepare(
-    `INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?,?,?,?)
-     ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth`,
+    `INSERT INTO push_subscriptions (endpoint, owner, p256dh, auth, created_at) VALUES (?,?,?,?,?)
+     ON CONFLICT(endpoint) DO UPDATE SET owner = excluded.owner, p256dh = excluded.p256dh, auth = excluded.auth`,
   )
-    .bind(b.endpoint, b.keys?.p256dh ?? null, b.keys?.auth ?? null, Date.now())
+    .bind(b.endpoint, c.get("userId"), b.keys?.p256dh ?? null, b.keys?.auth ?? null, Date.now())
     .run();
   return c.json({ ok: true });
 });
@@ -23,6 +23,8 @@ push.post("/subscribe", async (c) => {
 push.post("/unsubscribe", async (c) => {
   const b = await c.req.json<{ endpoint?: string }>().catch(() => ({}) as { endpoint?: string });
   if (!b.endpoint) return c.json({ error: "endpoint required" }, 400);
-  await c.env.DB.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`).bind(b.endpoint).run();
+  await c.env.DB.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ? AND owner = ?`)
+    .bind(b.endpoint, c.get("userId"))
+    .run();
   return c.json({ ok: true });
 });

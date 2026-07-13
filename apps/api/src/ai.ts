@@ -52,9 +52,13 @@ export async function callClaude(
 }
 
 /** Build a bounded plain-text rendering of a thread for the model. */
-export async function threadText(db: D1Database, message: MessageRow): Promise<string> {
+export async function threadText(
+  db: D1Database,
+  message: MessageRow,
+  owner: string | null,
+): Promise<string> {
   const threadKey = message.thread_id ?? message.message_id ?? message.id;
-  const thread = await getThread(db, threadKey);
+  const thread = await getThread(db, threadKey, owner);
   const msgs = thread.length ? thread : [message];
 
   const parts: string[] = [];

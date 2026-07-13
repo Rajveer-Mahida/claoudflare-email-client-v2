@@ -53,12 +53,13 @@ async function sendPush(env: Env, endpoint: string): Promise<number> {
   return res.status;
 }
 
-/** Push a data-less "new mail" wake to every subscription; prune dead ones. */
-export async function notifyNewMail(env: Env): Promise<void> {
+/** Push a data-less "new mail" wake to one owner's subscriptions; prune dead ones. */
+export async function notifyNewMail(env: Env, owner: string): Promise<void> {
   if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return;
   const subs =
-    (await env.DB.prepare(`SELECT endpoint FROM push_subscriptions`).all<{ endpoint: string }>())
-      .results ?? [];
+    (await env.DB.prepare(`SELECT endpoint FROM push_subscriptions WHERE owner = ?`)
+      .bind(owner)
+      .all<{ endpoint: string }>()).results ?? [];
   for (const s of subs) {
     try {
       const status = await sendPush(env, s.endpoint);
