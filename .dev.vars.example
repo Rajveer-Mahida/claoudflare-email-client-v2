@@ -1,17 +1,13 @@
-# Secrets. The Deploy-to-Cloudflare flow prompts for these; locally, copy to
-# .dev.vars. The two AUTH_ values are required to log in; the rest are optional
-# (leave empty to run without the feature).
+# Both values below are REQUIRED — without them you cannot log in.
+# (The deploy flow prompts for these; locally, copy to .dev.vars.)
+#
+# Optional features take secrets too, but add those after deploy so this form
+# stays minimal:
+#   wrangler secret put ANTHROPIC_API_KEY   # AI features (summarize, smart reply)
+#   wrangler secret put VAPID_PRIVATE_JWK   # web push — see scripts/generate-vapid.mjs
 
 # Password asked on the login screen. Pick something long and random.
 AUTH_PASSWORD=""
 
 # Random string used to sign the session cookie, e.g. `openssl rand -hex 32`.
 AUTH_SECRET=""
-
-# Anthropic API key — enables the AI features (summarize, smart reply).
-ANTHROPIC_API_KEY=""
-
-# Web-push VAPID private key (JWK JSON, single line). Generate a pair with:
-#   node scripts/generate-vapid.mjs
-# and put the public half in the VAPID_PUBLIC_KEY var.
-VAPID_PRIVATE_JWK=""
