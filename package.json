@@ -7,9 +7,21 @@
     "dev": "pnpm --filter @email/web dev",
     "dev:api": "pnpm --filter @email/api dev",
     "build": "pnpm --filter @email/web build",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
     "deploy:api": "pnpm --filter @email/api deploy",
     "deploy:web": "pnpm --filter @email/web deploy",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "generate-vapid": "node scripts/generate-vapid.mjs"
   },
-  "packageManager": "pnpm@9.12.0"
+  "devDependencies": {
+    "wrangler": "^4.90.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "cloudflare": {
+    "bindings": {
+      "DB": "D1 database holding mail, aliases, labels, drafts and settings",
+      "EMAIL_CACHE": "R2 bucket for raw .eml files and attachments",
+      "EMAIL": "Email Routing send_email binding used for replies/compose"
+    }
+  }
 }

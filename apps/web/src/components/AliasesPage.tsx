@@ -7,7 +7,7 @@ import { ArrowLeft, AtSign, Copy, Inbox, Trash2, Sparkles, Plus, Check, Ban } fr
 import type { AliasWithCount } from "@email/shared";
 import { useAliases, useCreateAlias, useUpdateAlias, useDeleteAlias, useSettings } from "@/api/hooks";
 import { useUI } from "@/lib/store";
-import { randomAlias } from "@/lib/alias";
+import { randomLocal } from "@/lib/alias";
 import { Button, IconButton, Spinner } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 
@@ -53,8 +53,7 @@ export function AliasesPage() {
   const dom = domain || settings.data?.primary_alias_domain || domains[0] || "";
 
   function generate() {
-    const full = randomAlias(dom);
-    setLocal(full.split(".smi@")[0]);
+    setLocal(randomLocal());
   }
 
   async function onCreate() {

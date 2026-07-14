@@ -60,7 +60,7 @@ export async function runScheduled(env: Env): Promise<void> {
         to: splitAddrs(msg.to_addr),
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
-        from: msg.from_addr || env.REPLY_FROM || "reply@rajveer.space",
+        from: msg.from_addr || env.REPLY_FROM,
         subject: msg.subject ?? "(no subject)",
         html: msg.html ?? undefined,
         text: msg.text ?? "",

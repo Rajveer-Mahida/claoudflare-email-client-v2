@@ -30,6 +30,7 @@ settings.get("/", async (c) => {
     compose_enabled: await getComposeEnabled(c.env.DB),
     primary_alias_domain: await getPrimaryAliasDomain(c.env.DB, c.env),
     alias_domains: aliasDomains(c.env),
+    alias_suffix: c.env.ALIAS_SUFFIX?.trim() ?? "",
     signature: (await getSetting(c.env.DB, "signature")) ?? "",
     block_remote_images: blockRaw === null ? true : blockRaw === "1",
     image_allowlist: parseAllowlist(await getSetting(c.env.DB, "image_allowlist")),

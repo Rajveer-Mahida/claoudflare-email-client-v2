@@ -5,9 +5,8 @@
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
 import { registerAlias, isAliasDisabled, applyRules } from "./db";
+import { aliasPattern } from "./settings";
 import { notifyNewMail } from "./push";
-
-const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
 
 export async function handleEmail(
   message: ForwardableEmailMessage,
@@ -15,9 +14,9 @@ export async function handleEmail(
   ctx: ExecutionContext,
 ): Promise<void> {
   const recipient = message.to.toLowerCase();
-  const pattern = new RegExp(env.ALIAS_PATTERN ?? DEFAULT_PATTERN, "i");
+  const pattern = aliasPattern(env);
 
-  if (!pattern.test(recipient)) {
+  if (!pattern || !pattern.test(recipient)) {
     if (env.FALLBACK_FORWARD_TO) {
       console.log("Forwarding non-alias email to fallback:", recipient, "->", env.FALLBACK_FORWARD_TO);
       await message.forward(env.FALLBACK_FORWARD_TO);

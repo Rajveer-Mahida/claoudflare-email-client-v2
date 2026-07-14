@@ -90,6 +90,7 @@ export type SettingsResponse = {
   compose_enabled: boolean;
   primary_alias_domain: string;
   alias_domains: string[];
+  alias_suffix: string;
   signature: string;
   block_remote_images: boolean;
   image_allowlist: string[];

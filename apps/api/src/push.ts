@@ -28,7 +28,7 @@ async function vapidJwt(env: Env, aud: string): Promise<string> {
     JSON.stringify({
       aud,
       exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-      sub: env.VAPID_SUBJECT || "mailto:admin@rajveer.space",
+      sub: env.VAPID_SUBJECT || "mailto:admin@example.com",
     }),
   );
   const data = `${header}.${payload}`;

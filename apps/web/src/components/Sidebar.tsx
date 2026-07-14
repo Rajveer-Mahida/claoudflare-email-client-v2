@@ -84,8 +84,12 @@ export function Sidebar() {
   }
 
   async function genAlias() {
-    const domain = settings.data?.primary_alias_domain ?? "rajveer.space";
-    const alias = randomAlias(domain);
+    const domain = settings.data?.primary_alias_domain;
+    if (!domain) {
+      toast.error("No alias domain configured", { description: "Set ALIAS_DOMAINS on the worker." });
+      return;
+    }
+    const alias = randomAlias(domain, settings.data?.alias_suffix ?? "");
     api.createAlias({ address: alias }).catch(() => {}); // track it in the registry
     try {
       await navigator.clipboard.writeText(alias);

@@ -11,11 +11,16 @@ const NOUNS = [
   "mutex", "cron", "redis", "pixel", "worker",
 ];
 
-const SUFFIX = "smi";
-
-export function randomAlias(domain: string): string {
+/** Random local part (no suffix/domain), e.g. "lazy-socket-4821". */
+export function randomLocal(): string {
   const adj = ADJS[Math.floor(Math.random() * ADJS.length)];
   const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
   const num = Math.floor(1000 + Math.random() * 9000);
-  return `${adj}-${noun}-${num}.${SUFFIX}@${domain}`;
+  return `${adj}-${noun}-${num}`;
+}
+
+/** Full alias address; suffix comes from instance settings ("" = none). */
+export function randomAlias(domain: string, suffix: string): string {
+  const local = randomLocal();
+  return suffix ? `${local}.${suffix}@${domain}` : `${local}@${domain}`;
 }
