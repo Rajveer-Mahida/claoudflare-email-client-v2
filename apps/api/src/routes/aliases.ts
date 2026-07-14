@@ -1,11 +1,9 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { listAliases, createAlias, updateAlias, deleteAlias } from "../db";
-import { aliasDomains, getPrimaryAliasDomain } from "../settings";
+import { aliasDomains, aliasPattern, getPrimaryAliasDomain } from "../settings";
 
 export const aliases = new Hono<HonoEnv>();
-
-const DEFAULT_PATTERN = "^[a-z0-9._%+-]+\\.smi@(rajveer\\.space|100xdev\\.qzz\\.io)$";
 
 aliases.get("/", async (c) => c.json(await listAliases(c.env.DB)));
 
@@ -14,8 +12,11 @@ aliases.post("/", async (c) => {
     .json<{ address?: string; local?: string; domain?: string; name?: string; note?: string }>()
     .catch(() => ({}) as Record<string, never>);
 
-  const suffix = c.env.ALIAS_SUFFIX ?? "smi";
+  const suffix = c.env.ALIAS_SUFFIX?.trim();
   const domains = aliasDomains(c.env);
+  if (!domains.length && !c.env.ALIAS_PATTERN) {
+    return c.json({ error: "No alias domain configured (set ALIAS_DOMAINS)" }, 400);
+  }
 
   let address = b.address?.trim().toLowerCase();
   if (!address) {
@@ -24,11 +25,11 @@ aliases.post("/", async (c) => {
     const local =
       (b.local?.trim().toLowerCase().replace(/[^a-z0-9._%+-]/g, "") || "") ||
       `alias-${Math.floor(1000 + Math.random() * 9000)}`;
-    address = `${local}.${suffix}@${domain}`;
+    address = suffix ? `${local}.${suffix}@${domain}` : `${local}@${domain}`;
   }
 
-  const pattern = new RegExp(c.env.ALIAS_PATTERN ?? DEFAULT_PATTERN, "i");
-  if (!pattern.test(address)) {
+  const pattern = aliasPattern(c.env);
+  if (!pattern || !pattern.test(address)) {
     return c.json({ error: "Invalid alias format" }, 400);
   }
 

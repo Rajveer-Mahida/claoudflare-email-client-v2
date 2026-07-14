@@ -1,0 +1,75 @@
+{
+  // ─────────────────────────────────────────────────────────────────────────
+  // One-click "Deploy to Cloudflare" template config.
+  //
+  // This root config exists for the deploy button (deploy.workers.cloudflare.com),
+  // which clones the repo, provisions the D1/R2 resources below under YOUR
+  // Cloudflare account (rewriting names/ids), prompts for the vars, then runs the
+  // root package.json `build` + `deploy` scripts.
+  //
+  // Rajveer's own instance deploys from apps/api/wrangler.jsonc (personal routes,
+  // real resource ids). If you change bindings/vars here, mirror them there.
+  // ─────────────────────────────────────────────────────────────────────────
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "driftmail",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2026-05-12",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+
+  // Single worker serves everything on <name>.<subdomain>.workers.dev:
+  //   /api/*  → the Hono worker (run_worker_first)
+  //   /*      → the built SPA static assets, with SPA fallback for client routes
+  "assets": {
+    "directory": "apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // The deploy flow provisions a fresh D1 database and R2 bucket and rewrites
+  // the ids/names below. Migrations run from the root `deploy` script.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "driftmail-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "apps/api/migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "EMAIL_CACHE",
+      "bucket_name": "driftmail-email-cache"
+    }
+  ],
+  "send_email": [{ "name": "EMAIL" }],
+
+  // Undo-send / scheduled-send cron.
+  "triggers": { "crons": ["* * * * *"] },
+
+  "vars": {
+    // Comma-separated domain(s) you receive mail on via Cloudflare Email Routing,
+    // e.g. "example.com" or "example.com,example.org".
+    "ALIAS_DOMAINS": "",
+    // Aliases look like <anything>.<suffix>@<domain>. Empty = no suffix segment.
+    "ALIAS_SUFFIX": "mail",
+    // From-address for replies/compose — must be a sender you can use with the
+    // send_email binding (see Email Routing → send limits / verified addresses).
+    "REPLY_FROM": "",
+    // Optional: also forward accepted inbound mail to this (verified) address.
+    "FORWARD_TO": "",
+    // Optional: where mail that matches no alias goes; empty = reject.
+    "FALLBACK_FORWARD_TO": "",
+    // Optional web push (see scripts/generate-vapid.mjs); leave empty to disable.
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_SUBJECT": "",
+    // Optional AI features model (needs ANTHROPIC_API_KEY secret).
+    "AI_MODEL": "claude-haiku-4-5"
+  }
+  // Secrets (see .dev.vars.example): AUTH_PASSWORD + AUTH_SECRET (required for
+  // login), ANTHROPIC_API_KEY + VAPID_PRIVATE_JWK (optional). Alternatively put
+  // the deployment behind Cloudflare Access and set ACCESS_TEAM_DOMAIN +
+  // ACCESS_AUD (+ optional ALLOWED_EMAILS) instead of the password.
+}
