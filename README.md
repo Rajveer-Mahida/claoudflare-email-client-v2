@@ -38,8 +38,14 @@ During setup you'll be asked for:
 | `ALIAS_DOMAINS` | for mail | comma-separated domain(s) you receive mail on |
 | `ALIAS_SUFFIX` | no | aliases look like `<name>.<suffix>@<domain>` (default `mail`; empty = no suffix) |
 | `REPLY_FROM` | for sending | from-address used for replies/compose |
-| `ANTHROPIC_API_KEY` (secret) | no | enables the AI features |
-| `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_JWK` (secret) | no | web push — generate with `node scripts/generate-vapid.mjs` |
+
+Optional features are enabled by secrets you add **after** deploy (Worker →
+Settings → Variables and Secrets, or `wrangler secret put …`):
+
+| Secret | Enables |
+|---|---|
+| `ANTHROPIC_API_KEY` | AI features (summarize, smart reply) |
+| `VAPID_PRIVATE_JWK` (+ `VAPID_PUBLIC_KEY` var) | web push — generate both with `node scripts/generate-vapid.mjs` |
 
 ### Connect your domain's email (manual, ~2 minutes)
 
