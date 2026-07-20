@@ -1,7 +1,7 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "smi-mail",
-  "main": "./src/index.ts",
+  "main": "../apps/api/src/index.ts",
   "compatibility_date": "2026-05-12",
   "workers_dev": false,
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -13,19 +13,21 @@
   //   /*      → the built SPA static assets, with SPA fallback for client routes
   "routes": [{ "pattern": "driftmail.rajveer.space", "custom_domain": true }],
   "assets": {
-    "directory": "../web/dist",
+    "directory": "../apps/web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
 
-  // Reuse the EXISTING resources from the legacy project — same data, no migrations.
+  // Reuse the EXISTING resources from the legacy project — same data.
+  // NEVER run `d1 migrations apply` against this DB: it predates D1 migration
+  // bookkeeping and 0004's ALTER TABLEs would fail. Deploy only.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "cf-email-alies",
       "database_id": "690cfb79-5466-441c-88f4-07277934f114",
-      "migrations_dir": "migrations"
+      "migrations_dir": "../apps/api/migrations"
     }
   ],
   "r2_buckets": [
@@ -36,7 +38,7 @@
   ],
   "send_email": [{ "name": "EMAIL" }],
 
-  // Undo-send cron — this worker is now the SINGLE owner (legacy workers deleted).
+  // Undo-send cron — this worker is the SINGLE owner (legacy workers deleted).
   "triggers": { "crons": ["* * * * *"] },
 
   "vars": {
@@ -51,7 +53,6 @@
     "VAPID_PUBLIC_KEY": "BK39lEZNlzqOZVBx_q2-IwCDXxsMhsv6i9f8hGYjbgIh3KrpUmuFrurLSn7w_bxcNL3sbFKlEtLMmq3Gu__uvo0",
     "AI_MODEL": "claude-haiku-4-5"
   }
-  // Secrets: VAPID_PRIVATE_JWK (push JWT signing), ANTHROPIC_API_KEY (AI features)
-
-  // Secrets (set via `wrangler secret put`): AUTH_SECRET, AUTH_PASSWORD
+  // Secrets (wrangler secret put <NAME> -c instances/smi-mail.jsonc):
+  // AUTH_SECRET, AUTH_PASSWORD, VAPID_PRIVATE_JWK, ANTHROPIC_API_KEY
 }

@@ -1,4 +1,0 @@
-# Copy to .dev.vars for local `wrangler dev`. Never commit the real file.
-# AUTH_SECRET must match the legacy worker if you want existing smi_session cookies to stay valid.
-AUTH_SECRET="dev-secret-change-me"
-AUTH_PASSWORD="changeme"

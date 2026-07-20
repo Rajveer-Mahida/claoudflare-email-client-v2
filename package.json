@@ -5,11 +5,10 @@
   "description": "Gmail-like email client — Vite SPA + Hono Cloudflare Worker, reusing existing D1/R2.",
   "scripts": {
     "dev": "pnpm --filter @email/web dev",
-    "dev:api": "pnpm --filter @email/api dev",
+    "dev:api": "wrangler dev --remote --port 8787 -c instances/smi-mail.jsonc",
     "build": "pnpm --filter @email/web build",
     "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
-    "deploy:api": "pnpm --filter @email/api deploy",
-    "deploy:web": "pnpm --filter @email/web deploy",
+    "deploy:smi": "VITE_PUBLIC_ORIGIN=https://driftmail.rajveer.space pnpm build && wrangler deploy -c instances/smi-mail.jsonc",
     "typecheck": "pnpm -r typecheck",
     "generate-vapid": "node scripts/generate-vapid.mjs"
   },

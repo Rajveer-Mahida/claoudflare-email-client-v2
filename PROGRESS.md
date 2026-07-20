@@ -71,11 +71,11 @@ Single Cloudflare Worker `smi-mail`: SPA (Vite/React 19) + Hono JSON API + inbou
   - `npx wrangler email sending enable 100xdev.qzz.io`
   - Receiving, aliases, rules, search, push all work without this.
 - **AI key** — Summarize / Suggest replies return "AI not set up yet" until set:
-  - `cd apps/api && npx wrangler secret put ANTHROPIC_API_KEY`
+  - `npx wrangler secret put ANTHROPIC_API_KEY -c instances/smi-mail.jsonc`
 
 ## Migrations applied (D1 `cf-email-alies`)
 `0004_compose` (cc/bcc + drafts) · `0005_aliases` · `0006_rules` · `0007_push`
 (`0001`–`0003` from the original project: messages/attachments/labels/settings/FTS)
 
 ## Deploy
-`pnpm --filter @email/web build && (cd apps/api && npx wrangler deploy)` — the worker bundles the built SPA. Secrets: `AUTH_SECRET`, `AUTH_PASSWORD`, `VAPID_PRIVATE_JWK`.
+`pnpm deploy:smi` (builds the SPA with the instance origin, then `wrangler deploy -c instances/smi-mail.jsonc`). Secrets: `AUTH_SECRET`, `AUTH_PASSWORD`, `VAPID_PRIVATE_JWK`.

@@ -1,48 +1,57 @@
 {
   // ─────────────────────────────────────────────────────────────────────────
-  // One-click "Deploy to Cloudflare" template config.
+  // Per-instance deploy config — one file per deployment/domain.
   //
-  // This root config exists for the deploy button (deploy.workers.cloudflare.com),
-  // which clones the repo, provisions the D1/R2 resources below under YOUR
-  // Cloudflare account (rewriting names/ids), prompts for the vars, then runs the
-  // root package.json `build` + `deploy` scripts.
+  //   cp instances/_template.jsonc instances/<name>.jsonc   # then fill every <...>
+  //   pnpm exec wrangler d1 create <name>-db                # paste database_id below
+  //   pnpm exec wrangler r2 bucket create <name>-email-cache
+  //   pnpm exec wrangler d1 migrations apply DB --remote -c instances/<name>.jsonc
+  //   VITE_PUBLIC_ORIGIN=https://<host> pnpm build
+  //   pnpm exec wrangler deploy -c instances/<name>.jsonc
   //
-  // Named instances (custom domains, real resource ids) deploy from
-  // instances/<name>.jsonc — see instances/_template.jsonc. If you change
-  // bindings/vars here, mirror them in the template and every instance file.
+  // Secrets (wrangler secret put <NAME> -c instances/<name>.jsonc):
+  //   AUTH_SECRET + AUTH_PASSWORD (required for login),
+  //   ANTHROPIC_API_KEY (optional AI), VAPID_PRIVATE_JWK (optional push).
+  // Or skip the password and put the deployment behind Cloudflare Access:
+  //   set ACCESS_TEAM_DOMAIN + ACCESS_AUD (+ optional ALLOWED_EMAILS) vars.
+  //
+  // Keep the structural block (main/assets/bindings/triggers/compat) in sync
+  // with the root wrangler.jsonc — that file is the one-click deploy template.
   // ─────────────────────────────────────────────────────────────────────────
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "driftmail",
-  "main": "apps/api/src/index.ts",
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "<instance>",
+  "main": "../apps/api/src/index.ts",
   "compatibility_date": "2026-05-12",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
   "observability": { "enabled": true },
   "upload_source_maps": true,
 
-  // Single worker serves everything on <name>.<subdomain>.workers.dev:
+  // Single worker serves everything on this hostname:
   //   /api/*  → the Hono worker (run_worker_first)
   //   /*      → the built SPA static assets, with SPA fallback for client routes
+  // The domain's zone must already exist in your Cloudflare account; wrangler
+  // attaches the custom domain on deploy.
+  "routes": [{ "pattern": "<mail.example.com>", "custom_domain": true }],
   "assets": {
-    "directory": "apps/web/dist",
+    "directory": "../apps/web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
   },
 
-  // The deploy flow provisions a fresh D1 database and R2 bucket and rewrites
-  // the ids/names below. Migrations run from the root `deploy` script.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "driftmail-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "apps/api/migrations"
+      "database_name": "<instance>-db",
+      "database_id": "<paste id from: wrangler d1 create <instance>-db>",
+      "migrations_dir": "../apps/api/migrations"
     }
   ],
   "r2_buckets": [
     {
       "binding": "EMAIL_CACHE",
-      "bucket_name": "driftmail-email-cache"
+      "bucket_name": "<instance>-email-cache"
     }
   ],
   "send_email": [{ "name": "EMAIL" }],
@@ -53,12 +62,12 @@
   "vars": {
     // Comma-separated domain(s) you receive mail on via Cloudflare Email Routing,
     // e.g. "example.com" or "example.com,example.org".
-    "ALIAS_DOMAINS": "",
+    "ALIAS_DOMAINS": "<example.com>",
     // Aliases look like <anything>.<suffix>@<domain>. Empty = no suffix segment.
     "ALIAS_SUFFIX": "mail",
     // From-address for replies/compose — must be a sender you can use with the
     // send_email binding (see Email Routing → send limits / verified addresses).
-    "REPLY_FROM": "",
+    "REPLY_FROM": "<reply@example.com>",
     // Optional: also forward accepted inbound mail to this (verified) address.
     "FORWARD_TO": "",
     // Optional: where mail that matches no alias goes; empty = reject.
@@ -69,8 +78,4 @@
     // Optional AI features model (needs ANTHROPIC_API_KEY secret).
     "AI_MODEL": "claude-haiku-4-5"
   }
-  // Secrets (see .dev.vars.example): AUTH_PASSWORD + AUTH_SECRET (required for
-  // login), ANTHROPIC_API_KEY + VAPID_PRIVATE_JWK (optional). Alternatively put
-  // the deployment behind Cloudflare Access and set ACCESS_TEAM_DOMAIN +
-  // ACCESS_AUD (+ optional ALLOWED_EMAILS) instead of the password.
 }

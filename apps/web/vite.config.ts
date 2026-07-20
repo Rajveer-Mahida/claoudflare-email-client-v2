@@ -3,8 +3,27 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
+// Canonical public origin for absolute-URL meta tags (og:url, og:image).
+// Unset (e.g. one-click deploys) → those tags are dropped; cards fall back
+// to title/description, which degrades better than a broken absolute URL.
+const publicOrigin = (process.env.VITE_PUBLIC_ORIGIN ?? "").replace(/\/+$/, "");
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "public-origin",
+      transformIndexHtml(html: string) {
+        return publicOrigin
+          ? html.replaceAll("__PUBLIC_ORIGIN__", publicOrigin)
+          : html
+              .split("\n")
+              .filter((l) => !l.includes("__PUBLIC_ORIGIN__"))
+              .join("\n");
+      },
+    },
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
