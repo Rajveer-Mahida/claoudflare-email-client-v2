@@ -22,12 +22,45 @@ export class ApiError extends Error {
   }
 }
 
+// Cloudflare Access answers an expired session at the edge with a cross-origin
+// 302 to its login host, before the worker ever runs. Under the default
+// `redirect: "follow"` the browser chases it and the fetch rejects with an
+// opaque CORS TypeError; `redirect: "manual"` surfaces it as an opaqueredirect
+// (status 0) we can recognise. Only a top-level navigation can complete the
+// Access handshake, so reload — but at most once per tab, so a gate that keeps
+// bouncing us can never spin the page.
+const ACCESS_RELOAD = "driftmail-access-reload";
+
+function reloadedOnce(): boolean {
+  try {
+    if (sessionStorage.getItem(ACCESS_RELOAD)) return true;
+    sessionStorage.setItem(ACCESS_RELOAD, "1");
+  } catch {
+    /* storage unavailable — fall through and reload */
+  }
+  return false;
+}
+
+function clearReloadGuard() {
+  try {
+    sessionStorage.removeItem(ACCESS_RELOAD);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
+    redirect: "manual",
     headers: init?.body ? { "content-type": "application/json" } : undefined,
     ...init,
   });
+  if (res.type === "opaqueredirect" || res.status === 0) {
+    if (!reloadedOnce()) window.location.reload();
+    throw new ApiError(401, "session expired");
+  }
+  clearReloadGuard();
   if (res.status === 401) {
     throw new ApiError(401, "unauthorized");
   }

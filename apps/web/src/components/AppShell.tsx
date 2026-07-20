@@ -8,7 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { Compose } from "@/components/Compose";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardHelp } from "@/components/KeyboardHelp";
-import { Spinner } from "@/components/primitives";
+import { Button, Spinner } from "@/components/primitives";
 import { useUI } from "@/lib/store";
 import { useShortcuts } from "@/lib/useShortcuts";
 
@@ -34,7 +34,7 @@ export function AppShell() {
     "?": () => setHelp(true),
   });
 
-  const { isLoading, error } = useQuery({
+  const { isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["auth", "me"],
     queryFn: api.me,
     retry: false,
@@ -62,7 +62,28 @@ export function AppShell() {
     );
   }
 
-  if (error) return null; // redirecting
+  if (error) {
+    // 401 → the effect above is navigating to /login; render nothing meanwhile.
+    if (error instanceof ApiError && error.status === 401) return null;
+    return (
+      <div className="app-backdrop grid h-full place-items-center p-6">
+        <div className="max-w-sm text-center">
+          <p className="font-display text-lg font-medium">Can’t reach your inbox</p>
+          <p className="mt-1 text-sm text-muted">
+            {(error as Error).message || "Something went wrong."}
+          </p>
+          <Button
+            variant="primary"
+            className="mt-4"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            {isFetching ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-backdrop flex h-full overflow-hidden">
