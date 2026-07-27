@@ -6,6 +6,15 @@ import { checkPassword, createSessionToken, cookieName, cookieMaxAge } from "../
 export const auth = new Hono<HonoEnv>();
 
 auth.post("/login", async (c) => {
+  // Fail closed rather than signing sessions with a guessable key: without
+  // both secrets set there is no safe way to issue a session at all.
+  if (!c.env.AUTH_SECRET || !c.env.AUTH_PASSWORD) {
+    return c.json(
+      { error: "Login is not configured — set the AUTH_SECRET and AUTH_PASSWORD secrets." },
+      503,
+    );
+  }
+
   const { password } = await c.req
     .json<{ password?: string }>()
     .catch(() => ({}) as { password?: string });
@@ -25,16 +34,9 @@ auth.post("/login", async (c) => {
 
 auth.post("/logout", (c) => {
   deleteCookie(c, cookieName(), { path: "/" });
-  // In Access mode, also bounce through the Cloudflare Access logout endpoint.
-  if (c.env.ACCESS_TEAM_DOMAIN && c.env.ACCESS_AUD) {
-    return c.json({
-      ok: true,
-      logoutUrl: `https://${c.env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/logout`,
-    });
-  }
   return c.json({ ok: true });
 });
 
-// Lightweight session probe for the SPA's auth gate; returns the signed-in
-// email when Access verified it.
-auth.get("/me", (c) => c.json({ ok: true, email: c.get("email") ?? null }));
+// Lightweight session probe for the SPA's auth gate. Reaching this at all means
+// the middleware accepted the session cookie.
+auth.get("/me", (c) => c.json({ ok: true }));

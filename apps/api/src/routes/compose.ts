@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { HonoEnv, Env, EmailAttachmentOut } from "../env";
 import type { ComposeRequest, UploadedAttachment } from "@email/shared";
 import { recordOutbound, getMessage, deleteDraft } from "../db";
-import { getComposeEnabled } from "../settings";
+import { getComposeEnabled, replyFrom } from "../settings";
 
 export const compose = new Hono<HonoEnv>();
 
@@ -46,7 +46,7 @@ compose.post("/", async (c) => {
     const parent = await getMessage(c.env.DB, body.inReplyToMessageId);
     if (parent) from = parent.direction === "in" ? parent.to_addr : parent.from_addr;
   }
-  from = from || c.env.REPLY_FROM;
+  from = from || replyFrom(c.env);
   if (!from) return c.json({ error: "No sender address" }, 500);
 
   const attachments = body.attachments ?? [];

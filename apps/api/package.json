@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "cf-typegen": "wrangler types -c ../../instances/smi-mail.jsonc"
+    "cf-typegen": "wrangler types -c ../../wrangler.jsonc"
   },
   "dependencies": {
     "@email/shared": "workspace:*",

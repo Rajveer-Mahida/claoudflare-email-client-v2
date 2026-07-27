@@ -121,6 +121,17 @@ export function useMessage(id: string | undefined) {
   });
 }
 
+/** mailed-by / signed-by for the details panel. Costs an R2 read and a MIME
+ *  parse on the worker, so it only runs once the panel is actually opened. */
+export function useMessageHeaderDetails(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["message-details", id ?? ""],
+    queryFn: () => api.messageHeaderDetails(id as string),
+    enabled: !!id && enabled,
+    staleTime: Infinity,
+  });
+}
+
 // ── cache helpers ────────────────────────────────────────────────────────────
 function eachMessageList(
   qc: QueryClient,

@@ -85,6 +85,16 @@ export type MessageDetail = {
   labels: LabelRow[];
 };
 
+/** Extra header-derived metadata for the Gmail-style "details" panel. Parsed
+ *  from the raw .eml on demand, so it isn't part of MessageRow. */
+export type MessageHeaderDetails = {
+  /** Domain that passed SPF — Gmail's "mailed-by". */
+  mailedBy: string | null;
+  /** Domain in the DKIM signature — Gmail's "signed-by". */
+  signedBy: string | null;
+  replyTo: string | null;
+};
+
 export type SettingsResponse = {
   reply_enabled: boolean;
   compose_enabled: boolean;

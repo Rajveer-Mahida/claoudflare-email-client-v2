@@ -3,6 +3,7 @@
 // is now the SINGLE owner of the cron (legacy workers deleted).
 
 import type { Env } from "./env";
+import { replyFrom } from "./settings";
 
 export async function runScheduled(env: Env): Promise<void> {
   const now = Date.now();
@@ -60,7 +61,7 @@ export async function runScheduled(env: Env): Promise<void> {
         to: splitAddrs(msg.to_addr),
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
-        from: msg.from_addr || env.REPLY_FROM,
+        from: msg.from_addr || replyFrom(env),
         subject: msg.subject ?? "(no subject)",
         html: msg.html ?? undefined,
         text: msg.text ?? "",

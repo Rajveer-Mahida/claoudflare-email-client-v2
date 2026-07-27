@@ -47,6 +47,8 @@ export function AliasesPage() {
   }
 
   const domains = settings.data?.alias_domains ?? [];
+  // Shape of generated addresses comes from the instance's ALIAS_SUFFIX.
+  const suffix = settings.data?.alias_suffix ?? "";
   const [name, setName] = useState("");
   const [local, setLocal] = useState("");
   const [domain, setDomain] = useState("");
@@ -95,7 +97,9 @@ export function AliasesPage() {
                 placeholder="custom"
                 className="min-w-0 flex-1 bg-transparent outline-none"
               />
-              <span className="shrink-0 font-mono text-xs text-faint">.smi@</span>
+              <span className="shrink-0 font-mono text-xs text-faint">
+                {suffix ? `.${suffix}@` : "@"}
+              </span>
               <select
                 value={dom}
                 onChange={(e) => setDomain(e.target.value)}

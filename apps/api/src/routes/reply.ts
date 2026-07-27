@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { insertOutbound, getMessage } from "../db";
-import { getReplyEnabled } from "../settings";
+import { getReplyEnabled, replyFrom } from "../settings";
 
 export const reply = new Hono<HonoEnv>();
 
@@ -35,7 +35,7 @@ reply.post("/", async (c) => {
       ? parent.to_addr
       : parent.from_addr
     : null;
-  const from = aliasFrom || c.env.REPLY_FROM;
+  const from = aliasFrom || replyFrom(c.env);
   if (!from) return c.json({ error: "no sender address available" }, 500);
 
   // Undo-send flow: persist as pending; the legacy email worker's cron sends it.

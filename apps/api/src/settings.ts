@@ -41,29 +41,65 @@ export async function setComposeEnabled(db: DB, enabled: boolean): Promise<void>
   await setSetting(db, "compose_enabled", enabled ? "1" : "0");
 }
 
-export function aliasDomains(env: Env): string[] {
-  const list = env.ALIAS_DOMAINS ?? env.ALIAS_DOMAIN ?? "";
-  return list
+function splitList(raw: string | undefined): string[] {
+  return (raw ?? "")
     .split(",")
     .map((d) => d.trim())
     .filter(Boolean);
+}
+
+export function aliasDomains(env: Env): string[] {
+  return splitList(env.ALIAS_DOMAINS);
+}
+
+/** Comma-separated allowlist of accepted recipients; `*` matches any run of
+ *  characters. Empty list = accept every address on the alias domains. */
+export function allowedEmails(env: Env): string[] {
+  return splitList(env.ALLOWED_EMAILS).map((e) => e.toLowerCase());
 }
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Matcher for addresses this instance accepts as aliases. An explicit
- *  ALIAS_PATTERN wins; otherwise derived from ALIAS_DOMAINS + ALIAS_SUFFIX
- *  (<local>.<suffix>@<domain>, or <local>@<domain> when no suffix). Null when
- *  neither a pattern nor any domain is configured — nothing is accepted. */
-export function aliasPattern(env: Env): RegExp | null {
-  if (env.ALIAS_PATTERN) return new RegExp(env.ALIAS_PATTERN, "i");
-  const domains = aliasDomains(env);
-  if (!domains.length) return null;
-  const suffix = env.ALIAS_SUFFIX?.trim();
-  const local = suffix ? `[a-z0-9._%+-]+\\.${escapeRe(suffix)}` : "[a-z0-9._%+-]+";
-  return new RegExp(`^${local}@(${domains.map(escapeRe).join("|")})$`, "i");
+/** Turn a `*`-glob into an anchored regex (`*` → `.*`, everything else literal). */
+function globToRe(glob: string): RegExp {
+  const body = glob.split("*").map(escapeRe).join(".*");
+  return new RegExp(`^${body}$`, "i");
+}
+
+/**
+ * Does this instance accept mail for `address`?
+ *
+ *   1. its domain must be listed in ALIAS_DOMAINS, else no;
+ *   2. an empty ALLOWED_EMAILS accepts everything on those domains;
+ *   3. otherwise it must match one ALLOWED_EMAILS entry (`*` wildcards allowed,
+ *      so `*.mail@example.com` reproduces a suffix-style scheme).
+ *
+ * With no ALIAS_DOMAINS configured nothing is accepted — an unconfigured
+ * instance must not become an open relay into the database.
+ */
+export function isAllowedRecipient(env: Env, address: string): boolean {
+  const addr = address.trim().toLowerCase();
+  const at = addr.lastIndexOf("@");
+  if (at < 1 || at === addr.length - 1) return false;
+
+  const domain = addr.slice(at + 1);
+  const domains = aliasDomains(env).map((d) => d.toLowerCase());
+  if (!domains.includes(domain)) return false;
+
+  const allowed = allowedEmails(env);
+  if (!allowed.length) return true;
+  return allowed.some((entry) => globToRe(entry).test(addr));
+}
+
+/** Fallback from-address for compose/reply when no alias applies.
+ *  Defaults to reply@<first alias domain> so it needn't be configured. */
+export function replyFrom(env: Env): string {
+  const explicit = env.REPLY_FROM?.trim();
+  if (explicit) return explicit;
+  const domain = aliasDomains(env)[0];
+  return domain ? `reply@${domain}` : "";
 }
 
 export async function getPrimaryAliasDomain(db: DB, env: Env): Promise<string> {

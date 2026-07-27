@@ -25,6 +25,7 @@ import {
   X as XIcon,
   Eye,
   MailX,
+  ChevronDown,
 } from "lucide-react";
 import type { MessageRow, AttachmentRow } from "@email/shared";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -37,6 +38,7 @@ import {
   useSettings,
   useSummarize,
   useSmartReply,
+  useMessageHeaderDetails,
 } from "@/api/hooks";
 import { api, ApiError } from "@/api/client";
 import { useUI } from "@/lib/store";
@@ -47,7 +49,7 @@ import { ReplyComposer } from "@/components/ReplyComposer";
 import { AttachmentLightbox, isPreviewable } from "@/components/AttachmentLightbox";
 import { useShortcuts } from "@/lib/useShortcuts";
 import { renderEmailHtml } from "@/lib/sanitize";
-import { formatFullDate, formatBytes, displayName } from "@/lib/utils";
+import { formatFullDate, formatBytes, displayName, cn } from "@/lib/utils";
 
 // Remember which individual messages the user chose to load images for (persists
 // the "just this email" choice across reloads, distinct from the per-sender allowlist).
@@ -478,6 +480,7 @@ function ThreadMessage({
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [showDetails, setDetails] = useState(false);
   const [loadImages, setLoadImages] = useState(() => loadedImageSet().has(m.id));
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
   const previewable = attachments.filter(isPreviewable);
@@ -512,10 +515,25 @@ function ThreadMessage({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-elevated">
-      <button
+      {/* A div rather than a button: the details toggle below is itself a
+          button, and buttons can't nest. Keeps the whole row as the collapse
+          target when this message is part of a thread. */}
+      <div
         onClick={() => collapsible && setOpen((o) => !o)}
-        disabled={!collapsible}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left disabled:cursor-default"
+        role={collapsible ? "button" : undefined}
+        tabIndex={collapsible ? 0 : undefined}
+        aria-expanded={collapsible ? isOpen : undefined}
+        onKeyDown={(e) => {
+          if (!collapsible) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
+        className={cn(
+          "flex w-full items-start gap-3 px-4 py-3.5 text-left",
+          collapsible && "cursor-pointer",
+        )}
       >
         <Avatar name={m.from_name} email={peer} size={38} />
         <div className="min-w-0 flex-1">
@@ -534,11 +552,50 @@ function ThreadMessage({
             ) : null}
             <span className="ml-auto shrink-0 text-[11px] text-faint">{formatFullDate(m.received_at)}</span>
           </div>
-          <p className="truncate text-xs text-muted">
-            {outbound ? `to ${m.to_addr}` : m.from_addr}
-          </p>
+
+          <div className="flex min-w-0 items-center gap-1">
+            <p className="truncate text-xs text-muted">
+              {outbound ? (
+                `to ${m.to_addr}`
+              ) : (
+                <>
+                  {m.from_addr}
+                  <span className="text-faint"> · to {m.to_addr}</span>
+                </>
+              )}
+            </p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // don't collapse the message
+                setDetails((d) => !d);
+              }}
+              aria-label={showDetails ? "Hide details" : "Show details"}
+              aria-expanded={showDetails}
+              className="shrink-0 rounded p-0.5 text-faint transition hover:bg-surface hover:text-fg"
+            >
+              <ChevronDown
+                size={13}
+                className={cn("transition-transform", showDetails && "rotate-180")}
+              />
+            </button>
+          </div>
+
+          <AnimatePresence initial={false}>
+            {showDetails && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.16 }}
+                className="overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MessageDetailsPanel message={m} enabled={showDetails} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </button>
+      </div>
 
       {scheduled && (
         <div className="flex items-center gap-2 border-t border-border bg-accent-soft/40 px-4 py-2 text-xs">
@@ -625,6 +682,53 @@ function ThreadMessage({
         onClose={() => setPreviewIdx(null)}
       />
     </div>
+  );
+}
+
+/**
+ * Gmail-style "details" panel: the full envelope for one message.
+ *
+ * from / to / cc / date come straight off the row; mailed-by and signed-by are
+ * derived from the raw .eml's auth headers, which is an R2 read plus a MIME
+ * parse — so that request only fires once the panel has been opened.
+ */
+function MessageDetailsPanel({ message, enabled }: { message: MessageRow; enabled: boolean }) {
+  const details = useMessageHeaderDetails(message.id, enabled);
+
+  const rows: Array<[string, string | null]> = [
+    ["from", message.from_name ? `${message.from_name} <${message.from_addr}>` : message.from_addr],
+    ["reply-to", details.data?.replyTo ?? null],
+    ["to", message.to_addr],
+    ["cc", message.cc],
+    ["bcc", message.bcc],
+    ["date", formatFullDate(message.received_at)],
+    ["mailed-by", details.data?.mailedBy ?? null],
+    ["signed-by", details.data?.signedBy ?? null],
+  ];
+
+  return (
+    <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-xl border border-border bg-surface/60 px-3 py-2 text-xs">
+      {rows.map(([label, value]) =>
+        value ? (
+          <div key={label} className="contents">
+            <dt className="whitespace-nowrap text-right text-faint">{label}:</dt>
+            <dd className="min-w-0 break-words text-muted">{value}</dd>
+          </div>
+        ) : null,
+      )}
+      {details.isPending && (
+        <div className="contents">
+          <dt className="whitespace-nowrap text-right text-faint">security:</dt>
+          <dd className="min-w-0 text-faint">checking…</dd>
+        </div>
+      )}
+      {details.isSuccess && !details.data?.mailedBy && !details.data?.signedBy && (
+        <div className="contents">
+          <dt className="whitespace-nowrap text-right text-faint">security:</dt>
+          <dd className="min-w-0 text-faint">no SPF/DKIM results on this message</dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
