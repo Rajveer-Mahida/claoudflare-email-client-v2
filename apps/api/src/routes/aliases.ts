@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { listAliases, createAlias, updateAlias, deleteAlias } from "../db";
-import { aliasDomains, aliasPattern, getPrimaryAliasDomain } from "../settings";
+import { aliasDomains, isAllowedRecipient, getPrimaryAliasDomain } from "../settings";
 
 export const aliases = new Hono<HonoEnv>();
 
@@ -14,7 +14,7 @@ aliases.post("/", async (c) => {
 
   const suffix = c.env.ALIAS_SUFFIX?.trim();
   const domains = aliasDomains(c.env);
-  if (!domains.length && !c.env.ALIAS_PATTERN) {
+  if (!domains.length) {
     return c.json({ error: "No alias domain configured (set ALIAS_DOMAINS)" }, 400);
   }
 
@@ -28,9 +28,12 @@ aliases.post("/", async (c) => {
     address = suffix ? `${local}.${suffix}@${domain}` : `${local}@${domain}`;
   }
 
-  const pattern = aliasPattern(c.env);
-  if (!pattern || !pattern.test(address)) {
-    return c.json({ error: "Invalid alias format" }, 400);
+  // An alias is only useful if mail addressed to it would actually be accepted.
+  if (!isAllowedRecipient(c.env, address)) {
+    return c.json(
+      { error: "That address wouldn't receive mail — it must match ALLOWED_EMAILS" },
+      400,
+    );
   }
 
   const row = await createAlias(c.env.DB, address, b.name?.trim() || null, b.note?.trim() || null);

@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import type { HonoEnv } from "../env";
+import { vapidPublicKey } from "../push";
 
 export const push = new Hono<HonoEnv>();
 
-// Public VAPID key for the browser's PushManager.subscribe.
-push.get("/key", (c) => c.json({ key: c.env.VAPID_PUBLIC_KEY ?? "" }));
+// Public VAPID key for the browser's PushManager.subscribe, derived from the
+// private JWK. Empty when push isn't configured — the SPA treats that as "off".
+push.get("/key", (c) => c.json({ key: vapidPublicKey(c.env) ?? "" }));
 
 push.post("/subscribe", async (c) => {
   const b = await c.req

@@ -100,11 +100,7 @@ export function Sidebar() {
   }
 
   async function logout() {
-    const r = await api.logout();
-    if (r.logoutUrl) {
-      window.location.href = r.logoutUrl; // Cloudflare Access sign-out
-      return;
-    }
+    await api.logout();
     navigate({ to: "/login" });
   }
 

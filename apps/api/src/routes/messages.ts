@@ -27,6 +27,8 @@ import {
   claimPendingMessage,
   markMessageSent,
 } from "../db";
+import { replyFrom } from "../settings";
+import { mailedBy, signedBy, replyToOf } from "../headers";
 
 const FLAG_FIELDS: FlagField[] = ["is_starred", "is_archived", "is_deleted", "is_read"];
 
@@ -103,6 +105,29 @@ async function unsubInfo(c: Context<HonoEnv>, id: string) {
   const lup = headers.find((h) => h.key === "list-unsubscribe-post")?.value;
   return { ...parseUnsub(lu), oneClick: !!lup && /one-click/i.test(lup) };
 }
+
+// GET → the "details" panel metadata (mailed-by / signed-by / reply-to).
+// Everything else the panel shows (from, to, cc, date) is already on the row,
+// so this is fetched lazily, only when the panel is actually opened — it costs
+// an R2 read plus a full MIME parse.
+messages.get("/:id/details", async (c) => {
+  const empty = { mailedBy: null, signedBy: null, replyTo: null };
+  const msg = await getMessage(c.env.DB, c.req.param("id"));
+  if (!msg?.raw_key) return c.json(empty);
+  const obj = await c.env.EMAIL_CACHE.get(msg.raw_key);
+  if (!obj) return c.json(empty);
+  try {
+    const parsed = await new PostalMime().parse(await obj.arrayBuffer());
+    const headers = parsed.headers ?? [];
+    return c.json({
+      mailedBy: mailedBy(headers),
+      signedBy: signedBy(headers),
+      replyTo: replyToOf(headers),
+    });
+  } catch {
+    return c.json(empty);
+  }
+});
 
 // GET → what unsubscribe options this message offers
 messages.get("/:id/unsubscribe", async (c) => {
@@ -243,7 +268,7 @@ messages.post("/send-now", async (c) => {
       to: splitAddrs(msg.to_addr),
       cc: cc.length ? cc : undefined,
       bcc: bcc.length ? bcc : undefined,
-      from: msg.from_addr || c.env.REPLY_FROM,
+      from: msg.from_addr || replyFrom(c.env),
       subject: msg.subject ?? "(no subject)",
       html: msg.html ?? undefined,
       text: msg.text ?? "",

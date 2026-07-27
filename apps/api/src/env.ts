@@ -22,32 +22,40 @@ export interface SendEmailBinding {
 }
 
 export type Env = {
+  // Bindings — see wrangler.jsonc / instances.jsonc.
   DB: D1Database;
   EMAIL_CACHE: R2Bucket;
   EMAIL: SendEmailBinding;
-  REPLY_FROM: string;
-  ALIAS_DOMAIN?: string;
+  ASSETS: Fetcher;
+
+  // Inbound mail. ALIAS_DOMAINS is the only required var: mail addressed to any
+  // other domain is rejected. ALLOWED_EMAILS narrows that further — empty means
+  // every address on those domains is accepted, entries may use `*` wildcards.
   ALIAS_DOMAINS?: string;
-  ALIAS_SUFFIX?: string;
-  AUTH_SECRET?: string;
-  AUTH_PASSWORD?: string;
-  // Cloudflare Access (Zero Trust) email gate — when ACCESS_AUD is set the
-  // worker verifies the Access JWT instead of the password session.
-  ACCESS_TEAM_DOMAIN?: string; // e.g. rajveer.cloudflareaccess.com
-  ACCESS_AUD?: string; // Access application Audience (AUD) tag
-  ALLOWED_EMAILS?: string; // comma-separated allowlist (empty = any Access-verified email)
-  // inbound email ingestion
-  ALIAS_PATTERN?: string;
+  ALLOWED_EMAILS?: string;
   FORWARD_TO?: string;
   FALLBACK_FORWARD_TO?: string;
-  // web push (VAPID)
-  VAPID_PUBLIC_KEY?: string;
+
+  // Display only: shapes the addresses the alias generator suggests
+  // (<name>.<suffix>@<domain>). Does not affect which mail is accepted.
+  ALIAS_SUFFIX?: string;
+
+  // Outbound fallback sender; defaults to reply@<first ALIAS_DOMAINS entry>.
+  REPLY_FROM?: string;
+
+  // Login. Both are secrets and both are required — auth fails closed without
+  // AUTH_SECRET rather than falling back to a well-known value.
+  AUTH_SECRET?: string;
+  AUTH_PASSWORD?: string;
+
+  // Web push (VAPID). The public key is derived from the private JWK.
   VAPID_SUBJECT?: string;
   VAPID_PRIVATE_JWK?: string;
-  // AI (Claude)
+
+  // AI (Claude). AI_MODEL overrides the default model.
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
 };
 
 /** Hono context env shape. */
-export type HonoEnv = { Bindings: Env; Variables: { email?: string | null } };
+export type HonoEnv = { Bindings: Env };

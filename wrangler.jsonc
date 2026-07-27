@@ -1,15 +1,17 @@
 {
   // ─────────────────────────────────────────────────────────────────────────
-  // One-click "Deploy to Cloudflare" template config.
+  // Structural config + one-click "Deploy to Cloudflare" defaults.
   //
-  // This root config exists for the deploy button (deploy.workers.cloudflare.com),
+  // This file is the config for the deploy button (deploy.workers.cloudflare.com),
   // which clones the repo, provisions the D1/R2 resources below under YOUR
   // Cloudflare account (rewriting names/ids), prompts for the vars, then runs the
-  // root package.json `build` + `deploy` scripts.
+  // root package.json `build` + `deploy` scripts. It deploys to
+  // driftmail.<your-subdomain>.workers.dev.
   //
-  // Named instances (custom domains, real resource ids) deploy from
-  // instances/<name>.jsonc — see instances/_template.jsonc. If you change
-  // bindings/vars here, mirror them in the template and every instance file.
+  // Deployments on your OWN domains live in `instances.jsonc` (gitignored) as
+  // wrangler environments — see instances.example.jsonc, then `pnpm instance:new <name>`.
+  // The structural block below (main / assets / compat / triggers / observability)
+  // is mirrored there; `pnpm check:config` fails the build if the two drift.
   // ─────────────────────────────────────────────────────────────────────────
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "driftmail",
@@ -19,7 +21,7 @@
   "observability": { "enabled": true },
   "upload_source_maps": true,
 
-  // Single worker serves everything on <name>.<subdomain>.workers.dev:
+  // Single worker serves everything on one hostname:
   //   /api/*  → the Hono worker (run_worker_first)
   //   /*      → the built SPA static assets, with SPA fallback for client routes
   "assets": {
@@ -51,26 +53,31 @@
   "triggers": { "crons": ["* * * * *"] },
 
   "vars": {
-    // Comma-separated domain(s) you receive mail on via Cloudflare Email Routing,
-    // e.g. "example.com" or "example.com,example.org".
+    // REQUIRED. Comma-separated domain(s) you receive mail on via Cloudflare
+    // Email Routing, e.g. "example.com" or "example.com,example.org".
+    // Mail addressed to any other domain is rejected.
     "ALIAS_DOMAINS": "",
-    // Aliases look like <anything>.<suffix>@<domain>. Empty = no suffix segment.
-    "ALIAS_SUFFIX": "mail",
-    // From-address for replies/compose — must be a sender you can use with the
-    // send_email binding (see Email Routing → send limits / verified addresses).
+    // Which addresses on those domains to accept. Empty = accept every address
+    // (a true catch-all inbox). Comma-separated; `*` is a wildcard, so
+    // "*.mail@example.com" accepts only <anything>.mail@example.com.
+    "ALLOWED_EMAILS": "",
+    // Shape of the addresses the alias generator suggests:
+    // <name>.<suffix>@<domain>. Empty = plain <name>@<domain>. Display only —
+    // it does not affect which mail is accepted (that's ALLOWED_EMAILS).
+    "ALIAS_SUFFIX": "",
+    // Optional from-address for compose when no alias applies.
+    // Defaults to reply@<first ALIAS_DOMAINS entry>.
     "REPLY_FROM": "",
     // Optional: also forward accepted inbound mail to this (verified) address.
     "FORWARD_TO": "",
-    // Optional: where mail that matches no alias goes; empty = reject.
+    // Optional: where rejected mail goes instead of bouncing; empty = reject.
     "FALLBACK_FORWARD_TO": "",
-    // Optional web push (see scripts/generate-vapid.mjs); leave empty to disable.
-    "VAPID_PUBLIC_KEY": "",
-    "VAPID_SUBJECT": "",
-    // Optional AI features model (needs ANTHROPIC_API_KEY secret).
-    "AI_MODEL": "claude-haiku-4-5"
+    // Optional web push contact, a mailto: URI. Empty = push disabled.
+    // The key pair itself is the VAPID_PRIVATE_JWK secret (pnpm generate-vapid).
+    "VAPID_SUBJECT": ""
   }
-  // Secrets (see .dev.vars.example): AUTH_PASSWORD + AUTH_SECRET (required for
-  // login), ANTHROPIC_API_KEY + VAPID_PRIVATE_JWK (optional). Alternatively put
-  // the deployment behind Cloudflare Access and set ACCESS_TEAM_DOMAIN +
-  // ACCESS_AUD (+ optional ALLOWED_EMAILS) instead of the password.
+  // Secrets (see .dev.vars.example): AUTH_PASSWORD + AUTH_SECRET are both
+  // REQUIRED — login fails closed without them. Optional: ANTHROPIC_API_KEY
+  // (AI features), VAPID_PRIVATE_JWK (web push), AI_MODEL (override the
+  // default Claude model).
 }
