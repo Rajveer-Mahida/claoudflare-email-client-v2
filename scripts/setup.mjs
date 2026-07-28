@@ -20,6 +20,7 @@ import {
   die,
   capture,
 } from "./lib/instances.mjs";
+import { wireUpDomain, describePlan, isConfigurableDomain } from "./lib/email-routing.mjs";
 
 const name = process.argv[2];
 if (!name) die("Usage: pnpm instance:new <name>    (e.g. pnpm instance:new acme)");
@@ -151,22 +152,45 @@ while (!password) {
 console.log(`· setting AUTH_PASSWORD`);
 putSecret("AUTH_PASSWORD", password);
 
+// ── 6. Offer to wire up the domain's mail ───────────────────────────────────
+// This changes live DNS and mail delivery, so it only runs on an explicit yes.
+const domains = aliasDomains
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean)
+  .filter(isConfigurableDomain);
+
+let wired = false;
+if (domains.length) {
+  console.log(describePlan(domains, name));
+  const answer = (await ask("Apply this now? [y/N]")).trim().toLowerCase();
+  if (answer === "y" || answer === "yes") {
+    const results = domains.map((d) => wireUpDomain(d, name));
+    wired = results.every((r) => r.ok);
+    console.log();
+    for (const r of results) {
+      console.log(r.ok ? `\x1b[32m✓ ${r.domain}\x1b[0m` : `\x1b[31m✗ ${r.domain}\x1b[0m — failed to ${r.step}`);
+    }
+    if (!wired) console.log(`\nRe-run for the failed domains with: pnpm instance:mail ${name}`);
+  } else {
+    console.log("\n\x1b[2mSkipped. Run `pnpm instance:mail " + name + "` when you're ready.\x1b[0m");
+  }
+}
+
 rl.close();
 
-// ── 6. What's left, which is the part Cloudflare can't automate ─────────────
-const domains = aliasDomains.split(",").map((d) => d.trim()).filter(Boolean);
 console.log(`
 \x1b[32m✓ "${name}" is configured.\x1b[0m
 
   \x1b[1mpnpm instance:deploy ${name}\x1b[0m
-
-Then wire up mail in the Cloudflare dashboard — deploy tooling still can't do
-this part. For each of ${domains.join(", ")}:
-
-  1. zone → Email → Email Routing → enable (Cloudflare adds the MX/SPF records)
-  2. Routing rules → Catch-all → action "Send to a Worker" → ${name}
-  3. pnpm exec wrangler email sending enable <domain>     (to send, per domain)
-
+${
+  wired
+    ? ""
+    : `
+Mail isn't routed yet — after deploying, run:
+  pnpm instance:mail ${name}
+`
+}
 Optional secrets:
   pnpm exec wrangler secret put ANTHROPIC_API_KEY -c instances.jsonc -e ${name}
   pnpm exec wrangler secret put VAPID_PRIVATE_JWK -c instances.jsonc -e ${name}   # pnpm generate-vapid

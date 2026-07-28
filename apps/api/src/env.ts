@@ -55,6 +55,20 @@ export type Env = {
   // AI (Claude). AI_MODEL overrides the default model.
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
+
+  // Optional in-app domain management. Deliberately NOT declared in wrangler
+  // `vars` or .dev.vars.example: anything listed there becomes a REQUIRED field
+  // in the one-click deploy form. Add them afterwards under
+  // Worker → Settings → Variables and Secrets to switch the feature on.
+  //
+  // CF_TOKEN needs Zone:Read + Email Routing Rules:Edit + Email Routing
+  // Addresses:Edit, plus DNS:Edit / DNS Settings:Edit to create the MX and SPF
+  // records. Scope it to the zones you actually use.
+  CF_TOKEN?: string;
+  CF_ACCOUNT_ID?: string;
+  /** Must match the deployed Worker name — it's the value sent to the Email
+   *  Routing rule API, and a Worker can't read its own script name. */
+  CF_WORKER_NAME?: string;
 };
 
 /** Hono context env shape. */

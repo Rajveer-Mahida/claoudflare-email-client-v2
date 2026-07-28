@@ -17,6 +17,7 @@ import { aliases } from "./routes/aliases";
 import { rules } from "./routes/rules";
 import { push } from "./routes/push";
 import { ai } from "./routes/ai";
+import { domains } from "./routes/domains";
 
 const app = new Hono<HonoEnv>();
 
@@ -50,6 +51,7 @@ app.route("/api/aliases", aliases);
 app.route("/api/rules", rules);
 app.route("/api/push", push);
 app.route("/api/ai", ai);
+app.route("/api/domains", domains);
 app.route("/api/attachments", attachments);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

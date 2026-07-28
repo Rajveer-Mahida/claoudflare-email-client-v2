@@ -553,8 +553,19 @@ function ThreadMessage({
             <span className="ml-auto shrink-0 text-[11px] text-faint">{formatFullDate(m.received_at)}</span>
           </div>
 
-          <div className="flex min-w-0 items-center gap-1">
-            <p className="truncate text-xs text-muted">
+          {/* The whole address line toggles the details panel, not just the
+              caret — the text is the obvious thing to click. stopPropagation
+              keeps it from also collapsing the message in a thread. */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetails((d) => !d);
+            }}
+            aria-label={showDetails ? "Hide details" : "Show details"}
+            aria-expanded={showDetails}
+            className="group/details -mx-1 flex min-w-0 max-w-full items-center gap-1 rounded px-1 text-left transition hover:bg-surface"
+          >
+            <span className="truncate text-xs text-muted">
               {outbound ? (
                 `to ${m.to_addr}`
               ) : (
@@ -563,22 +574,15 @@ function ThreadMessage({
                   <span className="text-faint"> · to {m.to_addr}</span>
                 </>
               )}
-            </p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation(); // don't collapse the message
-                setDetails((d) => !d);
-              }}
-              aria-label={showDetails ? "Hide details" : "Show details"}
-              aria-expanded={showDetails}
-              className="shrink-0 rounded p-0.5 text-faint transition hover:bg-surface hover:text-fg"
-            >
-              <ChevronDown
-                size={13}
-                className={cn("transition-transform", showDetails && "rotate-180")}
-              />
-            </button>
-          </div>
+            </span>
+            <ChevronDown
+              size={13}
+              className={cn(
+                "shrink-0 text-faint transition-transform group-hover/details:text-fg",
+                showDetails && "rotate-180",
+              )}
+            />
+          </button>
 
           <AnimatePresence initial={false}>
             {showDetails && (

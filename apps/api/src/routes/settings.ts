@@ -11,6 +11,7 @@ import {
   getSetting,
   setSetting,
 } from "../settings";
+import { domainManagementEnabled } from "../cloudflare";
 
 export const settings = new Hono<HonoEnv>();
 
@@ -34,6 +35,7 @@ settings.get("/", async (c) => {
     signature: (await getSetting(c.env.DB, "signature")) ?? "",
     block_remote_images: blockRaw === null ? true : blockRaw === "1",
     image_allowlist: parseAllowlist(await getSetting(c.env.DB, "image_allowlist")),
+    domain_management: domainManagementEnabled(c.env),
   });
 });
 

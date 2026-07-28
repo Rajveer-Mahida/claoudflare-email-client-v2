@@ -85,8 +85,11 @@ export function isAllowedRecipient(env: Env, address: string): boolean {
   if (at < 1 || at === addr.length - 1) return false;
 
   const domain = addr.slice(at + 1);
-  const domains = aliasDomains(env).map((d) => d.toLowerCase());
-  if (!domains.includes(domain)) return false;
+  const domains = aliasDomains(env);
+  // Entries may be globs, so "*" accepts any domain and "*.example.com"
+  // accepts every subdomain. Cloudflare only routes mail for zones you own,
+  // so "*" still can't be reached by mail for someone else's domain.
+  if (!domains.some((d) => globToRe(d).test(domain))) return false;
 
   const allowed = allowedEmails(env);
   if (!allowed.length) return true;

@@ -17,8 +17,8 @@
   //   pnpm instance:deploy <name>              build + migrate + deploy
   //   pnpm instance:deploy <name> --dry-run    resolve everything, upload nothing
   //
-  // Receiving mail is still a manual step per domain — Cloudflare can't
-  // provision Email Routing from deploy tooling. See the README.
+  // Wiring a domain's mail to the worker is a separate step, but it's one
+  // command: `pnpm instance:mail <name>` (add --dry-run to preview).
   // ─────────────────────────────────────────────────────────────────────────
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": "apps/api/src/index.ts",

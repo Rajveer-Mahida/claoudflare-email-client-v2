@@ -9,6 +9,7 @@ import { AppShell } from "@/components/AppShell";
 import { MailLayout } from "@/components/MailLayout";
 import { EmptyDetail } from "@/components/EmptyDetail";
 import { Spinner } from "@/components/primitives";
+import { ErrorFallback } from "@/components/ErrorBoundary";
 
 // Code-split the heavier leaf pages into their own chunks.
 const named = <T extends Record<string, ComponentType<unknown>>>(
@@ -120,6 +121,12 @@ export const router = createRouter({
   routeTree,
   defaultPreload: "intent",
   scrollRestoration: true,
+  // The router catches anything thrown inside a route component, so the
+  // top-level ErrorBoundary never sees those. Without this, they fall back to
+  // the router's bare default error component.
+  defaultErrorComponent: ({ error, reset }) => (
+    <ErrorFallback error={error as Error} onRetry={reset} />
+  ),
 });
 
 declare module "@tanstack/react-router" {

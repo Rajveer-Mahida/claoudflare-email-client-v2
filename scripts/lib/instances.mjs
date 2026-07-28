@@ -91,6 +91,22 @@ export function run(cmd, args, opts = {}) {
   return res;
 }
 
+/**
+ * Run a command, inheriting stdio, WITHOUT exiting on failure.
+ * Returns true/false so a caller can carry on with the remaining work — `run`
+ * exits the process, which is wrong when one item of a batch fails.
+ */
+export function tryRun(cmd, args, opts = {}) {
+  const shown = [cmd, ...args].join(" ");
+  console.log(`\n\x1b[2m$ ${shown}\x1b[0m`);
+  const res = spawnSync(cmd, args, { stdio: "inherit", cwd: ROOT, ...opts });
+  if (res.error) {
+    console.error(`  ${res.error.message}`);
+    return false;
+  }
+  return res.status === 0;
+}
+
 /** Run a command and capture stdout (still fails loudly). */
 export function capture(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, { encoding: "utf8", cwd: ROOT, ...opts });

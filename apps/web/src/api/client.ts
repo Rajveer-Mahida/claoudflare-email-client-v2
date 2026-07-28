@@ -13,6 +13,8 @@ import type {
   AliasWithCount,
   AliasRow,
   RuleRow,
+  DomainsResponse,
+  DomainDnsRecord,
 } from "@email/shared";
 
 export class ApiError extends Error {
@@ -147,6 +149,18 @@ export const api = {
     req<{ ok: true }>("/api/push/subscribe", body(sub)),
   pushUnsubscribe: (endpoint: string) =>
     req<{ ok: true }>("/api/push/unsubscribe", body({ endpoint })),
+
+  // domains (only when CF_TOKEN is configured; 503 otherwise)
+  listDomains: () => req<DomainsResponse>("/api/domains"),
+  domainDns: (zoneId: string) =>
+    req<{ records: DomainDnsRecord[] }>(`/api/domains/${zoneId}/dns`),
+  connectDomain: (zoneId: string) =>
+    req<{ ok: true; worker: string; sending: boolean; records: DomainDnsRecord[] }>(
+      "/api/domains",
+      body({ zoneId }),
+    ),
+  disconnectDomain: (zoneId: string) =>
+    req<{ ok: true }>(`/api/domains/${zoneId}`, { method: "DELETE" }),
 
   // rules
   listRules: () => req<RuleRow[]>("/api/rules"),
