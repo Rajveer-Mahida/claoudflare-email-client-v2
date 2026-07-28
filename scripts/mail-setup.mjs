@@ -4,8 +4,8 @@
 //   pnpm instance:mail --domain a.com --worker driftmail
 //   pnpm instance:mail <name> --dry-run        # print the commands, run nothing
 //
-// The --domain/--worker form exists for workers deployed with the one-click
-// button, which have no entry in instances.jsonc.
+// The --domain/--worker form exists for workers that have no entry in
+// instances.jsonc — e.g. one deployed from a different machine.
 
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
@@ -15,6 +15,7 @@ import {
   commandsFor,
   describePlan,
   isConfigurableDomain,
+  manualCatchAllSteps,
 } from "./lib/email-routing.mjs";
 
 const argv = process.argv.slice(2);
@@ -82,7 +83,8 @@ if (answer !== "y" && answer !== "yes") {
   process.exit(0);
 }
 
-const results = domains.map((d) => wireUpDomain(d, worker));
+const results = [];
+for (const d of domains) results.push(await wireUpDomain(d, worker));
 const failed = results.filter((r) => !r.ok);
 
 console.log();
@@ -97,9 +99,18 @@ for (const r of results) {
   }
 }
 
+const manual = results.filter((r) => r.needsManualCatchAll);
+if (manual.length) {
+  console.log(
+    `\n\x1b[33mMX and SPF records are in place, but mail isn't reaching the worker\n` +
+      `yet — the catch-all still needs pointing at it.\x1b[0m\n`,
+  );
+  for (const r of manual) console.log(manualCatchAllSteps(r.domain, worker) + "\n");
+}
+
 if (failed.length) {
   console.log(
-    `\n${failed.length} of ${results.length} domain(s) not configured. ` +
+    `${failed.length} of ${results.length} domain(s) not fully configured. ` +
       `The worker itself is deployed and unaffected; re-run this command for those domains.`,
   );
   process.exit(1);

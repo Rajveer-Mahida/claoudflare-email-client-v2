@@ -20,7 +20,12 @@ import {
   die,
   capture,
 } from "./lib/instances.mjs";
-import { wireUpDomain, describePlan, isConfigurableDomain } from "./lib/email-routing.mjs";
+import {
+  wireUpDomain,
+  describePlan,
+  isConfigurableDomain,
+  manualCatchAllSteps,
+} from "./lib/email-routing.mjs";
 
 const name = process.argv[2];
 if (!name) die("Usage: pnpm instance:new <name>    (e.g. pnpm instance:new acme)");
@@ -165,11 +170,15 @@ if (domains.length) {
   console.log(describePlan(domains, name));
   const answer = (await ask("Apply this now? [y/N]")).trim().toLowerCase();
   if (answer === "y" || answer === "yes") {
-    const results = domains.map((d) => wireUpDomain(d, name));
+    const results = [];
+    for (const d of domains) results.push(await wireUpDomain(d, name));
     wired = results.every((r) => r.ok);
     console.log();
     for (const r of results) {
       console.log(r.ok ? `\x1b[32m✓ ${r.domain}\x1b[0m` : `\x1b[31m✗ ${r.domain}\x1b[0m — failed to ${r.step}`);
+    }
+    for (const r of results.filter((x) => x.needsManualCatchAll)) {
+      console.log(`\n${manualCatchAllSteps(r.domain, name)}`);
     }
     if (!wired) console.log(`\nRe-run for the failed domains with: pnpm instance:mail ${name}`);
   } else {

@@ -4,8 +4,6 @@ A Gmail-like email client with smooth motion, running entirely on Cloudflare:
 one Worker serves the SPA, the JSON API, inbound email ingestion (Email
 Routing), and the undo-send cron.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Rajveer-Mahida/claoudflare-email-client-v2)
-
 - **`apps/web`** — Vite + React 19 SPA (TanStack Router + Query, Tailwind v4,
   Framer Motion). Pure static assets, zero SSR.
 - **`apps/api`** — Hono Cloudflare Worker: JSON API + Email Routing handler +
@@ -28,42 +26,10 @@ normal case, not a special mode.
 
 ## Deployment
 
-Two ways to deploy — both end up with the identical worker:
-
-| | Best for | Where it deploys from |
-|---|---|---|
-| **One-click button** | trying it out, non-technical setup | a clone of this repo in *your* GitHub, auto-CI |
-| **Named instance** | custom domain, multiple deployments, hacking on the code | this repo, from your machine |
-
-Either way, [connecting your domain's email](#connect-your-domains-email) is a
-separate step at the end — but it is one command, not dashboard clicking.
-
-### Option A — one click
-
-Click **Deploy to Cloudflare** above. Cloudflare clones this repo into your
-GitHub/GitLab account, provisions a fresh **D1 database** and **R2 bucket**,
-prompts for the required values below, builds the SPA, runs the D1 migrations,
-and deploys to `https://driftmail.<your-subdomain>.workers.dev`.
-
-The form asks for exactly three things: `ALIAS_DOMAINS`, `AUTH_SECRET` and
-`AUTH_PASSWORD`. Cloudflare marks **every** declared var as required — there is
-no optional-var concept — so the optional vars are deliberately left out of
-`wrangler.jsonc` and added later if you want them.
-
-Notes:
-
-- The button only works while the repository is public.
-- Migrations are idempotent — redeploys re-run them safely.
-- Not sure of your domain yet? `ALIAS_DOMAINS` accepts `*`.
-- See [Domains and DNS](#domains-and-dns) for how a hostname and the mail
-  records actually get attached.
-
-### Option B — named instance on your own domain
-
 Deployments live in `instances.jsonc` as [wrangler environments][envs], one
 `env.<name>` block per domain. That file is **gitignored** — it holds your
-hostnames, database ids and forwarding addresses, and this repo has to stay
-public for the deploy button. The tracked template is `instances.example.jsonc`.
+hostnames, database ids and forwarding addresses, none of which belong in a
+repo. The tracked template is `instances.example.jsonc`.
 
 [envs]: https://developers.cloudflare.com/workers/wrangler/environments/
 
@@ -87,9 +53,13 @@ pnpm instance:deploy <name> --dry-run          # resolve everything, upload noth
 pnpm instance:deploy <name> --skip-migrations  # DB predates D1 migration bookkeeping
 ```
 
-`wrangler.jsonc` and `instances.jsonc` each carry the same structural block
-(wrangler has no `extends`). `pnpm check:config` fails if the two drift, and it
-runs as part of `pnpm typecheck`.
+`wrangler.jsonc` holds the structural block (worker entrypoint, assets, compat
+date, cron) and is what `pnpm dev:api` runs against locally. `instances.jsonc`
+repeats that block for your real deployments, because wrangler has no `extends`.
+`pnpm check:config` fails if the two drift, and runs as part of `pnpm typecheck`.
+
+Connecting a domain's email is a separate step at the end — one command, see
+[below](#connect-your-domains-email).
 
 ## Configuration reference
 
@@ -101,10 +71,8 @@ runs as part of `pnpm typecheck`.
 | `AUTH_SECRET` | secret | signs the session cookie | **generate:** `openssl rand -hex 32` |
 | `ALIAS_DOMAINS` | var | comma-separated domain(s) you receive mail on; entries may be globs | your domain(s), e.g. `example.com`, or `*` for any |
 
-These three are the only fields the one-click deploy form asks for. Cloudflare
-marks **every** declared var as required, so the optional vars below are
-deliberately left out of `wrangler.jsonc` — add the ones you want afterwards
-under Worker → Settings → Variables and Secrets.
+`instance:new` prompts for these. Everything below is optional and has a working
+default, so a new instance needs nothing else to start receiving mail.
 
 Login **fails closed** if either secret is missing — there is no default signing
 key. Use a different `AUTH_SECRET` per instance: sessions carry no identity, so
@@ -148,12 +116,11 @@ generator suggests in the UI.
 |---|---|
 | the VAPID public key | derived from `VAPID_PRIVATE_JWK`, so the pair can't drift |
 | `VITE_PUBLIC_ORIGIN` | derived from the instance's route by `pnpm instance:deploy` |
-| `DB`, `EMAIL_CACHE`, `EMAIL`, `ASSETS` bindings | declared in the wrangler config; `instance:new` (or the one-click flow) provisions the resources |
-| D1 `database_id` | written by `instance:new`; the one-click flow writes it for you |
+| `DB`, `EMAIL_CACHE`, `EMAIL`, `ASSETS` bindings | declared in the wrangler config; `instance:new` provisions the resources |
+| D1 `database_id` | written by `instance:new` |
 
-Secrets go in via `wrangler secret put <NAME> -c instances.jsonc -e <name>`
-(one-click: Worker → Settings → Variables and Secrets); vars live in the
-wrangler/instance config.
+Secrets go in via `wrangler secret put <NAME> -c instances.jsonc -e <name>`, or
+Worker → Settings → Variables and Secrets; vars live in the instance config.
 
 ## Connect your domain's email
 
@@ -164,7 +131,8 @@ pnpm instance:mail <name>            # domains + worker read from instances.json
 pnpm instance:mail <name> --dry-run  # print the commands, run nothing
 ```
 
-For a worker deployed with the one-click button (no `instances.jsonc` entry):
+Or name the domain and worker directly, for a worker that has no
+`instances.jsonc` entry:
 
 ```sh
 pnpm instance:mail --domain example.com --worker driftmail
@@ -176,10 +144,25 @@ end. Under the hood, per domain:
 
 ```sh
 wrangler email routing enable <domain>          # adds and locks the MX + SPF records
-wrangler email routing rules update <domain> catch-all \
-    --action-type worker --action-value <worker> --enabled
+# catch-all → worker, via the API (see below)
 wrangler email sending enable <domain>          # outbound (compose/reply)
 ```
+
+**The catch-all step needs an API token.** `wrangler` refuses it —
+`wrangler email routing rules update <domain> catch-all --action-type worker`
+fails with *"Catch-all rule only supports 'forward' or 'drop' action types"* —
+even though the REST API accepts `worker` and the dashboard offers **Send to a
+Worker** for catch-alls. So that one step goes over the API instead:
+
+```sh
+export CLOUDFLARE_API_TOKEN=...   # Zone:Read + Email Routing Rules:Edit
+pnpm instance:mail <name>
+```
+
+Without a token the other steps still run, and the command prints the two-click
+dashboard alternative: zone → Email → Email Routing → Routing rules → Catch-all
+→ Edit → **Send to a Worker**. The in-app Domains UI is unaffected — it already
+calls the API directly.
 
 Catch-all is safe: mail failing the checks above is rejected or forwarded to
 `FALLBACK_FORWARD_TO`. But note that with `ALLOWED_EMAILS` empty, "fails the
@@ -200,7 +183,7 @@ The two things people expect to be linked are not:
 
 | What | How it gets set up |
 |---|---|
-| **Web hostname** | The button always deploys to `<worker>.<subdomain>.workers.dev` — its form has no custom-domain field. Attach one afterwards: Worker → Settings → Domains & Routes → **Add Custom Domain**. Cloudflare creates that DNS record itself. The zone must be in your account. For instances, `routes[].pattern` in `instances.jsonc` does it at deploy time. |
+| **Web hostname** | `routes[].pattern` in the instance's `env` block; `pnpm instance:deploy` attaches the custom domain and Cloudflare creates that DNS record itself. A worker with no route stays on `<worker>.<subdomain>.workers.dev`, and you can attach one later via Worker → Settings → Domains & Routes → **Add Custom Domain**. The zone must be in your account. |
 | **Mail records (MX, SPF, DKIM)** | Created by enabling Email Routing — `pnpm instance:mail` above, or the dashboard. Never hand-written. Inspect them with `wrangler email routing dns get <domain>`. |
 
 Requirements: the domain must be a zone in your Cloudflare account using
@@ -208,10 +191,10 @@ Cloudflare DNS. Propagation is usually 5–15 minutes.
 
 ### Managing domains from inside the app (optional)
 
-If you only ever clicked the deploy button, you can do all of the above from
-Settings → **Domains** instead of a terminal. It is off unless you set a
-`CF_TOKEN` secret on the worker; without it every `/api/domains` route returns
-503 and the section is hidden.
+You can also do all of the above from Settings → **Domains** instead of a
+terminal — useful for managing domains on a deployment you don't have checked
+out. It is off unless you set a `CF_TOKEN` secret on the worker; without it
+every `/api/domains` route returns 503 and the section is hidden.
 
 | Var | What it is |
 |---|---|

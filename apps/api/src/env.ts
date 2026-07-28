@@ -56,10 +56,9 @@ export type Env = {
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
 
-  // Optional in-app domain management. Deliberately NOT declared in wrangler
-  // `vars` or .dev.vars.example: anything listed there becomes a REQUIRED field
-  // in the one-click deploy form. Add them afterwards under
-  // Worker → Settings → Variables and Secrets to switch the feature on.
+  // Optional in-app domain management — off unless CF_TOKEN is set, which is
+  // why it isn't declared in wrangler `vars`. Set it per instance, or under
+  // Worker → Settings → Variables and Secrets, to switch the feature on.
   //
   // CF_TOKEN needs Zone:Read + Email Routing Rules:Edit + Email Routing
   // Addresses:Edit, plus DNS:Edit / DNS Settings:Edit to create the MX and SPF

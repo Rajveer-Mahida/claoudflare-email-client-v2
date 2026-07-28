@@ -4,7 +4,6 @@ dist/
 .dev.vars
 
 # Your real deployments — hostnames, database ids, forwarding addresses.
-# This repo stays public for the deploy button, so these never get committed.
 # Tracked template: instances.example.jsonc
 instances.jsonc
 

@@ -5,8 +5,8 @@
   //   cp instances.example.jsonc instances.jsonc     # then `pnpm instance:new <name>`
   //
   // instances.jsonc is GITIGNORED: it holds your hostnames, database ids and
-  // forwarding addresses, and this repo has to stay public for the deploy
-  // button to work. Only this example file is tracked.
+  // forwarding addresses, none of which belong in a repo. Only this example
+  // file is tracked.
   //
   // Everything above the `env` block is structural and must stay identical to
   // wrangler.jsonc — `pnpm check:config` fails if the two drift. Everything

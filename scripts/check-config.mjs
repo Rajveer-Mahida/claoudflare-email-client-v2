@@ -1,11 +1,10 @@
 // Guard against drift between the two wrangler configs.
 //
-// wrangler.jsonc holds the structural block for the one-click deploy; each
-// instance in instances.jsonc inherits the same structure for its environments.
-// Wrangler has no `extends`, so the block exists twice — this asserts the two
-// copies stay byte-equivalent.
+// wrangler.jsonc holds the structural block; each instance in instances.jsonc
+// repeats the same structure for its environments. Wrangler has no `extends`,
+// so the block exists twice — this asserts the two copies stay byte-equivalent.
 //
-// No-ops when instances.jsonc is absent (fresh clone, CI, one-click deploy).
+// No-ops when instances.jsonc is absent (fresh clone, CI).
 
 import { readFileSync, existsSync } from "node:fs";
 import { parseJsonc } from "./lib/jsonc.mjs";
