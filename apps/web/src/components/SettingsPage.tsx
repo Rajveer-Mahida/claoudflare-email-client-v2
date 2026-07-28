@@ -4,7 +4,13 @@ import * as Switch from "@radix-ui/react-switch";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowLeft, Check, Sun, Moon, Mail, Globe, Palette, PenLine, ShieldCheck, Bell } from "lucide-react";
-import { useSettings, useSetSettings } from "@/api/hooks";
+import {
+  useSettings,
+  useSetSettings,
+  useDomains,
+  useConnectDomain,
+  useDisconnectDomain,
+} from "@/api/hooks";
 import { useUI } from "@/lib/store";
 import { Button, Spinner } from "@/components/primitives";
 import { RulesManager } from "@/components/RulesManager";
@@ -137,6 +143,9 @@ export function SettingsPage() {
               })}
             </div>
           </Section>
+
+          {/* Domains — only when CF_TOKEN is configured on the worker */}
+          {s?.domain_management && <DomainsSection />}
 
           {/* Appearance */}
           <Section icon={<Palette size={18} />} title="Appearance" desc="Switch between light and dark.">
@@ -278,6 +287,110 @@ function Section({
         {!stack && <div className="shrink-0">{children}</div>}
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Connect a domain's mail to this worker, without leaving the app.
+ *
+ * Only rendered when the worker has a CF_TOKEN — every /api/domains route
+ * returns 503 otherwise. Connecting enables Email Routing (which writes the MX
+ * and SPF records) and points the zone's catch-all here.
+ */
+function DomainsSection() {
+  const domains = useDomains(true);
+  const connect = useConnectDomain();
+  const disconnect = useDisconnectDomain();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const zones = domains.data?.zones ?? [];
+  const worker = domains.data?.worker;
+
+  return (
+    <Section
+      icon={<Globe size={18} />}
+      title="Domains"
+      desc={
+        worker
+          ? `Route a domain's mail to this worker (${worker}).`
+          : "Route a domain's mail to this worker."
+      }
+      stack
+    >
+      <div className="mt-3 space-y-2">
+        {domains.isPending && (
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <Spinner className="text-accent" /> Loading your zones…
+          </div>
+        )}
+
+        {domains.isError && (
+          <p className="text-sm text-muted">
+            {(domains.error as Error).message ||
+              "Couldn't reach Cloudflare — check the CF_TOKEN scopes."}
+          </p>
+        )}
+
+        {domains.isSuccess && zones.length === 0 && (
+          <p className="text-sm text-muted">
+            No zones visible to this token. It needs Zone:Read for the domains you want.
+          </p>
+        )}
+
+        {zones.map((z) => (
+          <div
+            key={z.id}
+            className="flex items-center gap-3 rounded-xl border border-border bg-bg px-4 py-3"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-sm">{z.name}</p>
+              <p className="text-xs text-muted">
+                {z.routing.enabled ? "Email Routing enabled" : "Email Routing not enabled"}
+              </p>
+            </div>
+            {z.routing.enabled ? (
+              <Button
+                disabled={busy === z.id}
+                onClick={() => {
+                  setBusy(z.id);
+                  disconnect.mutate(z.id, {
+                    onSuccess: () => toast.success(`Email Routing disabled for ${z.name}`),
+                    onError: (e) => toast.error((e as Error).message),
+                    onSettled: () => setBusy(null),
+                  });
+                }}
+              >
+                {busy === z.id ? "Working…" : "Disconnect"}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                disabled={busy === z.id}
+                onClick={() => {
+                  setBusy(z.id);
+                  connect.mutate(z.id, {
+                    onSuccess: (r) =>
+                      toast.success(`${z.name} now routes here`, {
+                        description: r.sending
+                          ? "MX and SPF records added; sending enabled."
+                          : "MX and SPF records added. Enable Email Sending to send replies.",
+                      }),
+                    onError: (e) => toast.error((e as Error).message),
+                    onSettled: () => setBusy(null),
+                  });
+                }}
+              >
+                {busy === z.id ? "Connecting…" : "Connect"}
+              </Button>
+            )}
+          </div>
+        ))}
+
+        <p className="pt-1 text-xs text-faint">
+          Connecting writes MX and SPF records to the zone and sends all of its mail here.
+        </p>
+      </div>
+    </Section>
   );
 }
 

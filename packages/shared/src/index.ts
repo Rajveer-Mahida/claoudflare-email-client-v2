@@ -104,6 +104,25 @@ export type SettingsResponse = {
   signature: string;
   block_remote_images: boolean;
   image_allowlist: string[];
+  /** Whether CF_TOKEN is configured — the SPA hides the Domains section when
+   *  it isn't, since every /api/domains route returns 503. */
+  domain_management: boolean;
+};
+
+export type ZoneRow = {
+  id: string;
+  name: string;
+  status: string;
+  routing: { enabled: boolean; status?: string };
+};
+
+export type DomainsResponse = { worker: string; zones: ZoneRow[] };
+
+export type DomainDnsRecord = {
+  type: string;
+  name: string;
+  content: string;
+  priority?: number;
 };
 
 export type FlagField = "is_starred" | "is_archived" | "is_deleted" | "is_read";

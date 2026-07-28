@@ -53,6 +53,25 @@ test("matching is case-insensitive and tolerates whitespace in config", () => {
   assert.equal(isAllowedRecipient(e, "  Me@Example.Com  "), true);
 });
 
+// The one-click deploy form asks for ALIAS_DOMAINS before you've wired Email
+// Routing, so "*" needs to mean "whatever domain Cloudflare routes to me".
+test("ALIAS_DOMAINS supports globs", () => {
+  const any = env({ ALIAS_DOMAINS: "*" });
+  assert.equal(isAllowedRecipient(any, "anything@example.com"), true);
+  assert.equal(isAllowedRecipient(any, "anything@somewhere.else"), true);
+  assert.equal(isAllowedRecipient(any, "no-at-sign"), false);
+
+  const subs = env({ ALIAS_DOMAINS: "*.example.com" });
+  assert.equal(isAllowedRecipient(subs, "a@mail.example.com"), true);
+  assert.equal(isAllowedRecipient(subs, "a@example.com"), false);
+  assert.equal(isAllowedRecipient(subs, "a@evil.com"), false);
+
+  // A glob domain still composes with the recipient allowlist.
+  const both = env({ ALIAS_DOMAINS: "*", ALLOWED_EMAILS: "*.smi@*" });
+  assert.equal(isAllowedRecipient(both, "foo.smi@anything.com"), true);
+  assert.equal(isAllowedRecipient(both, "foo@anything.com"), false);
+});
+
 test("an unconfigured instance accepts nothing", () => {
   assert.equal(isAllowedRecipient(env({}), "anyone@anywhere.com"), false);
   assert.equal(isAllowedRecipient(env({ ALIAS_DOMAINS: "" }), "anyone@anywhere.com"), false);

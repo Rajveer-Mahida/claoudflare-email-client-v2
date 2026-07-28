@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, Navigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/api/client";
@@ -13,7 +13,6 @@ import { useUI } from "@/lib/store";
 import { useShortcuts } from "@/lib/useShortcuts";
 
 export function AppShell() {
-  const navigate = useNavigate();
   const composeOpen = useUI((s) => s.composeOpen);
   const { openCompose, setPalette, setHelp } = useUI();
 
@@ -41,11 +40,7 @@ export function AppShell() {
     staleTime: 60_000,
   });
 
-  useEffect(() => {
-    if (error instanceof ApiError && error.status === 401) {
-      navigate({ to: "/login" });
-    }
-  }, [error, navigate]);
+  const unauthorized = error instanceof ApiError && error.status === 401;
 
   if (isLoading) {
     return (
@@ -63,8 +58,11 @@ export function AppShell() {
   }
 
   if (error) {
-    // 401 → the effect above is navigating to /login; render nothing meanwhile.
-    if (error instanceof ApiError && error.status === 401) return null;
+    // A 401 means the session is gone — typically after the tab has sat in the
+    // background and refetch-on-focus revalidated it. Redirect declaratively:
+    // an effect + `return null` used to leave a permanently blank page whenever
+    // the navigation didn't take, which is the worst possible failure here.
+    if (unauthorized) return <Navigate to="/login" replace />;
     return (
       <div className="app-backdrop grid h-full place-items-center p-6">
         <div className="max-w-sm text-center">

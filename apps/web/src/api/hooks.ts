@@ -344,3 +344,25 @@ export function useSetSettings() {
     onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
   });
 }
+
+// ── domains (only meaningful when CF_TOKEN is set) ───────────────────────────
+
+export function useDomains(enabled: boolean) {
+  return useQuery({ queryKey: ["domains"], queryFn: api.listDomains, enabled });
+}
+
+export function useConnectDomain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (zoneId: string) => api.connectDomain(zoneId),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["domains"] }),
+  });
+}
+
+export function useDisconnectDomain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (zoneId: string) => api.disconnectDomain(zoneId),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["domains"] }),
+  });
+}

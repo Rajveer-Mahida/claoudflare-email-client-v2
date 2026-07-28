@@ -66,9 +66,8 @@ Single Cloudflare Worker `smi-mail` (instance `smi` in `instances.jsonc`): SPA (
 ## 🎉 All 8 phases complete
 
 ## ⚠️ Operator actions required (need your Cloudflare account)
-- **Email Sending onboarding** — sending (compose/reply/forward) fails with "destination not verified" until the domains are onboarded:
-  - `npx wrangler email sending enable rajveer.space`
-  - `npx wrangler email sending enable 100xdev.qzz.io`
+- **Email Sending onboarding** — sending (compose/reply/forward) fails with "destination not verified" until the domains are onboarded. Both domains at once:
+  - `pnpm instance:mail smi` (idempotent; `--dry-run` to preview)
   - Receiving, aliases, rules, search, push all work without this.
 - **AI key** — Summarize / Suggest replies return "AI not set up yet" until set:
   - `npx wrangler secret put ANTHROPIC_API_KEY -c instances.jsonc -e smi`

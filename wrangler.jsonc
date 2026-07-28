@@ -52,29 +52,25 @@
   // Undo-send / scheduled-send cron.
   "triggers": { "crons": ["* * * * *"] },
 
+  // Every var declared here becomes a REQUIRED field in the deploy button's
+  // form — Cloudflare has no notion of an optional var — so only genuinely
+  // required config lives here. The optional vars below are read by the worker
+  // with sensible defaults and can be added afterwards under
+  // Worker → Settings → Variables and Secrets:
+  //
+  //   ALLOWED_EMAILS       which addresses to accept; empty = all of them
+  //   ALIAS_SUFFIX         shape of generated aliases; empty = <name>@<domain>
+  //   REPLY_FROM           defaults to reply@<first ALIAS_DOMAINS entry>
+  //   FORWARD_TO           also forward accepted mail to a verified address
+  //   FALLBACK_FORWARD_TO  where rejected mail goes; empty = reject
+  //   VAPID_SUBJECT        mailto: contact for web push; empty = push off
+  //   AI_MODEL             overrides the default Claude model
   "vars": {
-    // REQUIRED. Comma-separated domain(s) you receive mail on via Cloudflare
-    // Email Routing, e.g. "example.com" or "example.com,example.org".
-    // Mail addressed to any other domain is rejected.
-    "ALIAS_DOMAINS": "",
-    // Which addresses on those domains to accept. Empty = accept every address
-    // (a true catch-all inbox). Comma-separated; `*` is a wildcard, so
-    // "*.mail@example.com" accepts only <anything>.mail@example.com.
-    "ALLOWED_EMAILS": "",
-    // Shape of the addresses the alias generator suggests:
-    // <name>.<suffix>@<domain>. Empty = plain <name>@<domain>. Display only —
-    // it does not affect which mail is accepted (that's ALLOWED_EMAILS).
-    "ALIAS_SUFFIX": "",
-    // Optional from-address for compose when no alias applies.
-    // Defaults to reply@<first ALIAS_DOMAINS entry>.
-    "REPLY_FROM": "",
-    // Optional: also forward accepted inbound mail to this (verified) address.
-    "FORWARD_TO": "",
-    // Optional: where rejected mail goes instead of bouncing; empty = reject.
-    "FALLBACK_FORWARD_TO": "",
-    // Optional web push contact, a mailto: URI. Empty = push disabled.
-    // The key pair itself is the VAPID_PRIVATE_JWK secret (pnpm generate-vapid).
-    "VAPID_SUBJECT": ""
+    // Comma-separated domain(s) you receive mail on via Cloudflare Email
+    // Routing, e.g. "example.com" or "example.com,example.org". Entries may be
+    // globs: "*" accepts any domain Email Routing sends here, which is the
+    // easy choice when you haven't picked the domain yet.
+    "ALIAS_DOMAINS": "*"
   }
   // Secrets (see .dev.vars.example): AUTH_PASSWORD + AUTH_SECRET are both
   // REQUIRED — login fails closed without them. Optional: ANTHROPIC_API_KEY
