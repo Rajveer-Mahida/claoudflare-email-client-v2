@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../env";
 import { insertOutbound, getMessage } from "../db";
 import { getReplyEnabled, replyFrom } from "../settings";
+import { sendMail } from "../send";
 
 export const reply = new Hono<HonoEnv>();
 
@@ -57,7 +58,12 @@ reply.post("/", async (c) => {
   }
 
   try {
-    const resp = await c.env.EMAIL.send({
+    const resp = await sendMail(c.env, {
+      // Thread the reply onto the message it answers.
+      inReplyTo: parent?.message_id ?? null,
+      references: parent
+        ? [parent.in_reply_to, parent.message_id].filter((x): x is string => !!x)
+        : undefined,
       to: String(to),
       from,
       subject: String(subject),

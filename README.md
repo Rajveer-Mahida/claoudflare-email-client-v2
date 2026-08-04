@@ -91,6 +91,7 @@ a shared secret makes cookies interchangeable between deployments.
 | `VAPID_PRIVATE_JWK` | secret | web push signing key | **generate:** `pnpm generate-vapid` |
 | `ANTHROPIC_API_KEY` | secret | AI features (summarize, smart reply) | [console.anthropic.com](https://console.anthropic.com) |
 | `AI_MODEL` | secret/var | model for AI features | `claude-haiku-4-5` |
+| `RESEND_API_KEY` | secret | send replies to *anyone* — see [Sending mail](#sending-mail) | unset = Cloudflare binding, verified addresses only |
 
 ### Which mail gets accepted
 
@@ -213,11 +214,60 @@ create the MX/SPF records.
 > `AUTH_PASSWORD` long and random, and leave `CF_TOKEN` unset if you are happy
 > using `pnpm instance:mail` from a terminal.
 
-None of these are declared in `wrangler.jsonc` or `.dev.vars.example` on purpose:
-anything listed there becomes a **required** field in the deploy form. Add them
-after deploying, under Worker → Settings → Variables and Secrets.
+None of these are declared in `wrangler.jsonc`: they are secrets, and the
+feature stays off until you set them. Add them per instance with
+`wrangler secret put <NAME> -c instances.jsonc -e <name>`, or under
+Worker → Settings → Variables and Secrets.
 
 Then open the app, log in with `AUTH_PASSWORD`, and generate your first alias.
+
+## Sending mail
+
+Receiving works out of the box. **Sending has a catch**, and it is worth
+understanding before you wonder why a reply bounced.
+
+Cloudflare's `send_email` binding may only deliver to **verified destination
+addresses** — addresses you own and have confirmed under Email Routing →
+Destination addresses. Replying to an actual correspondent fails with:
+
+```
+Send failed: destination address is not a verified address
+```
+
+and their address can never be verified, because Cloudflare sends the
+confirmation link to *them*, not to you. Lifting the restriction requires
+Cloudflare **Email Sending**, which needs the **Workers Paid** plan.
+
+So there are two ways to send to arbitrary recipients:
+
+| | How | Cost |
+|---|---|---|
+| **Cloudflare Email Sending** | upgrade to Workers Paid, then `pnpm exec wrangler email sending enable <domain>`. Nothing to configure in this app. | $5/mo |
+| **Resend** | set the `RESEND_API_KEY` secret. The worker uses it automatically. | free tier: 3k/month |
+
+Without `RESEND_API_KEY` the binding is used exactly as before, so an instance
+on Workers Paid needs no API key and nothing changes for it.
+
+### Setting up Resend
+
+1. Add your **alias domain** at [resend.com/domains](https://resend.com/domains)
+   and add the DNS records it gives you. It must be the alias domain — replies
+   are sent *from* the alias that received the thread, not from a separate
+   sender address.
+2. Create an API key, then:
+   ```sh
+   pnpm exec wrangler secret put RESEND_API_KEY -c instances.jsonc -e <name>
+   ```
+
+### When a send fails
+
+A send that cannot succeed — unverified domain, bad API key, malformed
+request — is marked **failed** and stops retrying. The message shows
+"Couldn't send" with **Retry** and **Discard**. Transient failures (rate
+limits, 5xx, network) keep retrying on the one-minute cron as before.
+
+Retries carry an `Idempotency-Key`, so a send that the provider accepted but
+whose response never arrived is not delivered twice.
 
 ## Local development
 

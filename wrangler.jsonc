@@ -1,17 +1,15 @@
 {
   // ─────────────────────────────────────────────────────────────────────────
-  // Structural config + one-click "Deploy to Cloudflare" defaults.
+  // Structural config, and the config `pnpm dev:api` runs against locally.
   //
-  // This file is the config for the deploy button (deploy.workers.cloudflare.com),
-  // which clones the repo, provisions the D1/R2 resources below under YOUR
-  // Cloudflare account (rewriting names/ids), prompts for the vars, then runs the
-  // root package.json `build` + `deploy` scripts. It deploys to
-  // driftmail.<your-subdomain>.workers.dev.
+  // Real deployments live in `instances.jsonc` (gitignored) as wrangler
+  // environments — see instances.example.jsonc, then `pnpm instance:new <name>`.
+  // The structural block below (main / assets / compat / triggers /
+  // observability) is mirrored there, because wrangler has no `extends`;
+  // `pnpm check:config` fails the build if the two drift.
   //
-  // Deployments on your OWN domains live in `instances.jsonc` (gitignored) as
-  // wrangler environments — see instances.example.jsonc, then `pnpm instance:new <name>`.
-  // The structural block below (main / assets / compat / triggers / observability)
-  // is mirrored there; `pnpm check:config` fails the build if the two drift.
+  // The D1 id below is a placeholder: local dev uses a local database, and every
+  // real deployment declares its own in instances.jsonc.
   // ─────────────────────────────────────────────────────────────────────────
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "driftmail",
@@ -31,8 +29,7 @@
     "run_worker_first": ["/api/*"]
   },
 
-  // The deploy flow provisions a fresh D1 database and R2 bucket and rewrites
-  // the ids/names below. Migrations run from the root `deploy` script.
+  // Placeholders — local dev uses a local D1; real ids live in instances.jsonc.
   "d1_databases": [
     {
       "binding": "DB",
@@ -52,11 +49,9 @@
   // Undo-send / scheduled-send cron.
   "triggers": { "crons": ["* * * * *"] },
 
-  // Every var declared here becomes a REQUIRED field in the deploy button's
-  // form — Cloudflare has no notion of an optional var — so only genuinely
-  // required config lives here. The optional vars below are read by the worker
-  // with sensible defaults and can be added afterwards under
-  // Worker → Settings → Variables and Secrets:
+  // Only genuinely required config lives here. The optional vars below are read
+  // by the worker with sensible defaults; set them per instance in
+  // instances.jsonc, or under Worker → Settings → Variables and Secrets:
   //
   //   ALLOWED_EMAILS       which addresses to accept; empty = all of them
   //   ALIAS_SUFFIX         shape of generated aliases; empty = <name>@<domain>

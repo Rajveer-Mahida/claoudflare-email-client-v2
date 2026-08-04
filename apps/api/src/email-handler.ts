@@ -4,8 +4,9 @@
 
 import PostalMime from "postal-mime";
 import type { Env } from "./env";
-import { registerAlias, isAliasDisabled, applyRules } from "./db";
+import { registerAlias, isAliasDisabled, applyRules, findThreadByMessageIds } from "./db";
 import { isAllowedRecipient } from "./settings";
+import { headerValue } from "./headers";
 import { notifyNewMail } from "./push";
 
 export async function handleEmail(
@@ -47,7 +48,18 @@ export async function handleEmail(
 
   const text = parsed.text ?? "";
   const snippet = text.replace(/\s+/g, " ").trim().slice(0, 200);
-  const threadId = parsed.inReplyTo || parsed.messageId || id;
+  // Thread on the whole References chain, not just the immediate parent — a
+  // reply to mail we sent names a provider-assigned Message-ID we never stored,
+  // so matching only In-Reply-To would strand it in a new thread.
+  const referenceIds = [
+    ...(parsed.inReplyTo ? [parsed.inReplyTo] : []),
+    ...(headerValue(parsed.headers, "references")?.match(/<[^>]+>/g) ?? []),
+  ];
+  const threadId =
+    (await findThreadByMessageIds(env.DB, referenceIds)) ??
+    parsed.inReplyTo ??
+    parsed.messageId ??
+    id;
   const fromAddr = parsed.from?.address ?? message.from;
   const fromName = parsed.from?.name ?? null;
 

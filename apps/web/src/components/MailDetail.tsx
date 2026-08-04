@@ -504,6 +504,18 @@ function ThreadMessage({
     await api.setSettings({ allow_image_sender: sender });
     qc.invalidateQueries({ queryKey: ["settings"] });
   }
+  // send-now claims 'failed' rows as well as 'pending', so it doubles as Retry.
+  function retrySend() {
+    api
+      .sendNow(m.id)
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["messages"] });
+        qc.invalidateQueries({ queryKey: ["message"] });
+        toast.success("Sent");
+      })
+      .catch((err) => toast.error((err as Error)?.message ?? "Still couldn't send"));
+  }
+
   function cancelScheduled() {
     api.cancelSend(m.id).then(() => {
       qc.invalidateQueries({ queryKey: ["messages"] });
@@ -544,6 +556,10 @@ function ThreadMessage({
             {scheduled ? (
               <span className="flex items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
                 <Clock3 size={11} /> Scheduled · {formatFullDate(m.send_after!)}
+              </span>
+            ) : m.send_state === "failed" ? (
+              <span className="flex items-center gap-1 rounded-full bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-danger">
+                <XCircle size={11} /> not sent
               </span>
             ) : m.send_state === "pending" ? (
               <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">
@@ -611,6 +627,27 @@ function ThreadMessage({
           >
             <XCircle size={13} /> Cancel
           </button>
+        </div>
+      )}
+
+      {/* A failed send stops retrying, so without this the message would just
+          sit there with no explanation once the toast has gone. */}
+      {m.send_state === "failed" && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-danger/10 px-4 py-2 text-xs">
+          <XCircle size={14} className="shrink-0 text-danger" />
+          <span className="text-muted">
+            {m.send_error?.trim()
+              ? `Couldn’t send — ${m.send_error}`
+              : "Couldn’t send — the address or sending domain was rejected."}
+          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <button onClick={retrySend} className="font-medium text-accent hover:underline">
+              Retry
+            </button>
+            <button onClick={cancelScheduled} className="font-medium text-danger hover:underline">
+              Discard
+            </button>
+          </div>
         </div>
       )}
 

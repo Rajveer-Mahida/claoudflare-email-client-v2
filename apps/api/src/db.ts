@@ -14,6 +14,7 @@ import type {
   AliasWithCount,
   RuleRow,
 } from "@email/shared";
+import { expandMessageIdCandidates } from "./headers";
 
 type DB = D1Database;
 
@@ -750,21 +751,99 @@ export async function applyRulesToExisting(db: DB): Promise<number> {
   return touched;
 }
 
+/**
+ * Find the thread a reply belongs to, given the Message-IDs from its
+ * In-Reply-To and References headers.
+ *
+ * The immediate parent alone isn't enough: mail we send goes out through a
+ * provider that assigns its own Message-ID (`…@email.amazonses.com`), which we
+ * never see and so can't have stored. A reply to *that* message therefore
+ * matches nothing and would start a new thread. Its References chain still
+ * carries the original inbound Message-ID, which we do know — so match against
+ * the whole chain, and against thread ids we already use.
+ *
+ * Candidates are expanded to both bracketed and bare forms so either storage
+ * convention matches.
+ */
+export async function findThreadByMessageIds(
+  db: DB,
+  candidates: string[],
+): Promise<string | null> {
+  const ids = expandMessageIdCandidates(candidates, 20);
+  if (!ids.length) return null;
+  const placeholders = ids.map(() => "?").join(",");
+  const row = await db
+    .prepare(
+      `SELECT thread_id FROM messages
+        WHERE message_id IN (${placeholders}) OR thread_id IN (${placeholders})
+        ORDER BY received_at ASC LIMIT 1`,
+    )
+    .bind(...ids, ...ids)
+    .first<{ thread_id: string | null }>();
+  return row?.thread_id ?? null;
+}
+
+/**
+ * Depth-2 References chain for a scheduled/send-now reply: grandparent
+ * Message-ID (if we have the parent row) + the immediate parent id.
+ */
+export async function referencesForOutbound(
+  db: DB,
+  inReplyTo: string | null,
+): Promise<string[] | undefined> {
+  if (!inReplyTo) return undefined;
+  const ids = expandMessageIdCandidates([inReplyTo], 4);
+  if (!ids.length) return [inReplyTo];
+  const placeholders = ids.map(() => "?").join(",");
+  const parent = await db
+    .prepare(
+      `SELECT message_id, in_reply_to FROM messages
+        WHERE message_id IN (${placeholders}) LIMIT 1`,
+    )
+    .bind(...ids)
+    .first<{ message_id: string | null; in_reply_to: string | null }>();
+  return [parent?.in_reply_to, inReplyTo].filter((x): x is string => !!x);
+}
+
+/** Claims `failed` rows too, so send-now doubles as the Retry action. */
 export async function claimPendingMessage(db: DB, id: string): Promise<boolean> {
   const res = await db
-    .prepare(`UPDATE messages SET send_state='sending' WHERE id = ? AND send_state = 'pending'`)
+    .prepare(
+      `UPDATE messages SET send_state='sending', send_error=NULL
+        WHERE id = ? AND send_state IN ('pending','failed')`,
+    )
     .bind(id)
     .run();
   return (res.meta?.changes ?? 0) > 0;
 }
 
 export async function markMessageSent(db: DB, id: string): Promise<void> {
-  await db.prepare(`UPDATE messages SET send_state='sent' WHERE id = ?`).bind(id).run();
+  await db
+    .prepare(`UPDATE messages SET send_state='sent', send_error=NULL WHERE id = ?`)
+    .bind(id)
+    .run();
 }
 
+/** Park a send as failed or pending-with-error after a provider failure. */
+export async function markSendOutcome(
+  db: DB,
+  id: string,
+  state: "failed" | "pending",
+  error: string,
+): Promise<void> {
+  await db
+    .prepare(`UPDATE messages SET send_state = ?, send_error = ? WHERE id = ?`)
+    .bind(state, error.slice(0, 500), id)
+    .run();
+}
+
+/** Cancels `failed` rows too, so a send that can't succeed can be dismissed. */
 export async function cancelPendingMessage(db: DB, id: string): Promise<boolean> {
   const res = await db
-    .prepare(`UPDATE messages SET send_state='cancelled' WHERE id = ? AND send_state = 'pending'`)
+    .prepare(
+      `UPDATE messages SET send_state='cancelled', send_error=NULL
+        WHERE id = ? AND send_state IN ('pending','failed')`,
+    )
     .bind(id)
     .run();
   return (res.meta?.changes ?? 0) > 0;

@@ -56,6 +56,12 @@ export type Env = {
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
 
+  // Outbound mail. Without this, sending goes through the send_email binding,
+  // which only reaches verified destination addresses — fine for forwarding to
+  // yourself, useless for replying to anyone else. Set it to send through
+  // Resend instead. A secret, so not declared in wrangler `vars`.
+  RESEND_API_KEY?: string;
+
   // Optional in-app domain management — off unless CF_TOKEN is set, which is
   // why it isn't declared in wrangler `vars`. Set it per instance, or under
   // Worker → Settings → Variables and Secrets, to switch the feature on.

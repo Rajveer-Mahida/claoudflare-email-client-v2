@@ -3,6 +3,7 @@ import type { HonoEnv, Env, EmailAttachmentOut } from "../env";
 import type { ComposeRequest, UploadedAttachment } from "@email/shared";
 import { recordOutbound, getMessage, deleteDraft } from "../db";
 import { getComposeEnabled, replyFrom } from "../settings";
+import { sendMail } from "../send";
 
 export const compose = new Hono<HonoEnv>();
 
@@ -40,11 +41,16 @@ compose.post("/", async (c) => {
   if (!to.length) return c.json({ error: "At least one recipient required" }, 400);
   if (!body.subject?.trim()) return c.json({ error: "Subject required" }, 400);
 
+  // Fetched up front: needed for the threading headers even when the sender
+  // was given explicitly.
+  const parent = body.inReplyToMessageId
+    ? await getMessage(c.env.DB, body.inReplyToMessageId)
+    : null;
+
   // Sender: explicit, else the thread's alias (reply/forward), else REPLY_FROM.
   let from = body.from?.trim() || "";
-  if (!from && body.inReplyToMessageId) {
-    const parent = await getMessage(c.env.DB, body.inReplyToMessageId);
-    if (parent) from = parent.direction === "in" ? parent.to_addr : parent.from_addr;
+  if (!from && parent) {
+    from = parent.direction === "in" ? parent.to_addr : parent.from_addr;
   }
   from = from || replyFrom(c.env);
   if (!from) return c.json({ error: "No sender address" }, 500);
@@ -77,7 +83,11 @@ compose.post("/", async (c) => {
   }
 
   try {
-    await c.env.EMAIL.send({
+    await sendMail(c.env, {
+      inReplyTo: parent?.message_id ?? null,
+      references: parent
+        ? [parent.in_reply_to, parent.message_id].filter((x): x is string => !!x)
+        : undefined,
       to,
       cc: cc.length ? cc : undefined,
       bcc: bcc.length ? bcc : undefined,

@@ -3,7 +3,10 @@
 
 export type Direction = "in" | "out";
 
-export type SendState = "pending" | "sending" | "sent" | "cancelled" | null;
+/** `failed` means retrying won't help (unverified sending domain, bad API key).
+ *  The cron only picks up `pending`, so this is what stops a broken send from
+ *  retrying every minute forever. */
+export type SendState = "pending" | "sending" | "sent" | "cancelled" | "failed" | null;
 
 export type MessageRow = {
   id: string;
@@ -30,6 +33,8 @@ export type MessageRow = {
   snooze_until: number | null;
   send_after: number | null;
   send_state: SendState;
+  /** Last provider error when send_state is pending/failed; null otherwise. */
+  send_error: string | null;
 };
 
 export type AttachmentRow = {

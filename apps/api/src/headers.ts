@@ -27,8 +27,40 @@ export function domainOf(address: string | undefined | null): string | null {
 }
 
 /** postal-mime lowercases header keys; be tolerant anyway. */
-function headerValue(headers: MailHeader[], key: string): string | undefined {
+export function headerValue(headers: MailHeader[], key: string): string | undefined {
   return headers.find((h) => h.key?.toLowerCase() === key)?.value;
+}
+
+/** Message-IDs travel in angle brackets; stored values may lack them. */
+export function messageIdRef(id: string): string {
+  const t = id.trim();
+  return t.startsWith("<") ? t : `<${t}>`;
+}
+
+/** Strip angle brackets for comparisons against bare stored Message-IDs. */
+export function messageIdBare(id: string): string {
+  const t = id.trim();
+  return t.startsWith("<") && t.endsWith(">") ? t.slice(1, -1).trim() : t;
+}
+
+/**
+ * Expand each Message-ID into bracketed + bare forms so DB lookups match
+ * either storage convention. Caps at `limit` distinct values.
+ */
+export function expandMessageIdCandidates(ids: string[], limit = 20): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const t = raw?.trim();
+    if (!t) continue;
+    for (const v of [messageIdRef(t), messageIdBare(t)]) {
+      if (!v || seen.has(v)) continue;
+      seen.add(v);
+      out.push(v);
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
 }
 
 /**

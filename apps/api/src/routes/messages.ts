@@ -26,8 +26,11 @@ import {
   cancelPendingMessage,
   claimPendingMessage,
   markMessageSent,
+  markSendOutcome,
+  referencesForOutbound,
 } from "../db";
 import { replyFrom } from "../settings";
+import { sendMail, SendError } from "../send";
 import { mailedBy, signedBy, replyToOf } from "../headers";
 
 const FLAG_FIELDS: FlagField[] = ["is_starred", "is_archived", "is_deleted", "is_read"];
@@ -264,7 +267,10 @@ messages.post("/send-now", async (c) => {
     const cc = splitAddrs(msg.cc);
     const bcc = splitAddrs(msg.bcc);
 
-    await c.env.EMAIL.send({
+    await sendMail(c.env, {
+      idempotencyKey: id,
+      inReplyTo: msg.in_reply_to,
+      references: await referencesForOutbound(c.env.DB, msg.in_reply_to),
       to: splitAddrs(msg.to_addr),
       cc: cc.length ? cc : undefined,
       bcc: bcc.length ? bcc : undefined,
@@ -278,8 +284,11 @@ messages.post("/send-now", async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.error("send-now failed", err);
-    // Revert the claim so the row isn't stuck in 'sending' forever.
-    await c.env.DB.prepare(`UPDATE messages SET send_state='pending' WHERE id = ?`).bind(id).run();
-    return c.json({ error: (err as Error)?.message ?? "send failed" }, 500);
+    // Release the claim so the row isn't stuck in 'sending' forever — as
+    // 'failed' when retrying can't help, so the cron stops picking it up.
+    const permanent = err instanceof SendError && err.permanent;
+    const message = (err as Error)?.message ?? "send failed";
+    await markSendOutcome(c.env.DB, id, permanent ? "failed" : "pending", message);
+    return c.json({ error: message }, 500);
   }
 });

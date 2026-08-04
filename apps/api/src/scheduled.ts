@@ -4,17 +4,20 @@
 
 import type { Env } from "./env";
 import { replyFrom } from "./settings";
+import { sendMail, SendError } from "./send";
+import { markSendOutcome, referencesForOutbound } from "./db";
 
 export async function runScheduled(env: Env): Promise<void> {
   const now = Date.now();
 
   const { results: pending } = await env.DB.prepare(
-    `SELECT id, to_addr, cc, bcc, from_addr, subject, html, text FROM messages
+    `SELECT id, in_reply_to, to_addr, cc, bcc, from_addr, subject, html, text FROM messages
       WHERE send_state = 'pending' AND send_after <= ? AND is_deleted = 0`,
   )
     .bind(now)
     .all<{
       id: string;
+      in_reply_to: string | null;
       to_addr: string;
       cc: string | null;
       bcc: string | null;
@@ -29,7 +32,7 @@ export async function runScheduled(env: Env): Promise<void> {
 
   for (const msg of pending ?? []) {
     const claim = await env.DB.prepare(
-      `UPDATE messages SET send_state = 'sending' WHERE id = ? AND send_state = 'pending'`,
+      `UPDATE messages SET send_state = 'sending', send_error = NULL WHERE id = ? AND send_state = 'pending'`,
     )
       .bind(msg.id)
       .run();
@@ -57,7 +60,12 @@ export async function runScheduled(env: Env): Promise<void> {
 
       const cc = splitAddrs(msg.cc);
       const bcc = splitAddrs(msg.bcc);
-      await env.EMAIL.send({
+      await sendMail(env, {
+        // The cron can run this row again; let the provider de-duplicate rather
+        // than sending a real person the same mail twice.
+        idempotencyKey: msg.id,
+        inReplyTo: msg.in_reply_to,
+        references: await referencesForOutbound(env.DB, msg.in_reply_to),
         to: splitAddrs(msg.to_addr),
         cc: cc.length ? cc : undefined,
         bcc: bcc.length ? bcc : undefined,
@@ -67,11 +75,26 @@ export async function runScheduled(env: Env): Promise<void> {
         text: msg.text ?? "",
         attachments: attachments.length ? attachments : undefined,
       });
-      await env.DB.prepare(`UPDATE messages SET send_state = 'sent' WHERE id = ?`).bind(msg.id).run();
+      await env.DB.prepare(
+        `UPDATE messages SET send_state = 'sent', send_error = NULL WHERE id = ?`,
+      )
+        .bind(msg.id)
+        .run();
     } catch (err) {
-      console.error("scheduled send failed", msg.id, err);
-      // revert claim so it can retry next tick
-      await env.DB.prepare(`UPDATE messages SET send_state = 'pending' WHERE id = ?`).bind(msg.id).run();
+      // Log the reason, not just a stack — the previous form gave no clue why.
+      console.error(
+        "scheduled send failed",
+        msg.id,
+        (err as Error)?.message ?? String(err),
+        err instanceof SendError ? `status=${err.status} permanent=${err.permanent}` : "",
+      );
+      // A permanent failure (unverified domain, bad key, malformed request)
+      // fails identically next minute and every minute after, so park it as
+      // 'failed' — the cron only picks up 'pending'. Transient failures still
+      // revert to 'pending' and retry.
+      const permanent = err instanceof SendError && err.permanent;
+      const message = (err as Error)?.message ?? "send failed";
+      await markSendOutcome(env.DB, msg.id, permanent ? "failed" : "pending", message);
     }
   }
 }
