@@ -1,4 +1,4 @@
-# Driftmail — `email-client-v2`
+# Driftmail
 
 A Gmail-like email client with smooth motion, running entirely on Cloudflare:
 one Worker serves the SPA, the JSON API, inbound email ingestion (Email
